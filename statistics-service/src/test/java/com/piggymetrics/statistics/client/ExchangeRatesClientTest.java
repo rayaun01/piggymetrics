@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.junit4.SpringRunner;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 
 import static org.junit.Assert.assertEquals;
@@ -36,6 +37,8 @@ public class ExchangeRatesClientTest {
 		assertNotNull(container.getRates().get(Currency.USD.name()));
 		assertNotNull(container.getRates().get(Currency.EUR.name()));
 		assertNotNull(container.getRates().get(Currency.RUB.name()));
+		assertNotNull(container.getRates().get(Currency.JPY.name()));
+		assertEquals(new BigDecimal("147.85"), container.getRates().get(Currency.JPY.name()));
 	}
 
 	@Test

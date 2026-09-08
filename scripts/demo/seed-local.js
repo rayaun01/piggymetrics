@@ -1,5 +1,5 @@
 // Loaded by seed-local.sh through the Mongo shell.
-const password = "__MONGODB_PASSWORD__";
+const password = seedPassword;
 const databases = [
     "piggymetrics_auth",
     "piggymetrics_accounts",

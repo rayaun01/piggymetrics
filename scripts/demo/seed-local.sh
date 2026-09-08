@@ -6,6 +6,7 @@ MONGO_BIN="${MONGO_BIN:-mongo}"
 MONGODB_PASSWORD="${MONGODB_PASSWORD:-password}"
 MONGO_AUTH="${MONGO_AUTH:-1}"
 SEED_FILE="$(mktemp)"
+PASSWORD_JSON="$(printf '%s' "$MONGODB_PASSWORD" | python3 -c 'import json, sys; print(json.dumps(sys.stdin.read()))')"
 trap 'rm -f "$SEED_FILE"' EXIT
 
 if [[ "$MONGO_BIN" == */* ]]; then
@@ -19,13 +20,14 @@ elif ! command -v "$MONGO_BIN" >/dev/null 2>&1; then
 fi
 
 sed \
-  -e "s#__MONGODB_PASSWORD__#${MONGODB_PASSWORD//\\/\\\\}#" \
   -e "s#__ACCOUNT_DUMP__#$ROOT_DIR/mongodb/dump/account-service-dump.js#" \
   "$ROOT_DIR/scripts/demo/seed-local.js" >"$SEED_FILE"
 
 if [[ "$MONGO_AUTH" == "1" ]]; then
   "$MONGO_BIN" piggymetrics_auth -u user -p "$MONGODB_PASSWORD" \
-    --authenticationDatabase piggymetrics_auth "$SEED_FILE"
+    --authenticationDatabase piggymetrics_auth \
+    --eval "var seedPassword = ${PASSWORD_JSON};" "$SEED_FILE"
 else
-  "$MONGO_BIN" admin "$SEED_FILE"
+  "$MONGO_BIN" admin \
+    --eval "var seedPassword = ${PASSWORD_JSON};" "$SEED_FILE"
 fi

@@ -31,6 +31,12 @@ pipeline {
             }
         }
 
+        stage('verify full profile') {
+            steps {
+                sh 'mvn -B -fae -Pfull verify'
+            }
+        }
+
         stage('JUnit reports') {
             steps {
                 junit testResults: '**/target/surefire-reports/*.xml',
@@ -62,6 +68,7 @@ pipeline {
 | Actions cache | `stash` or the Pipeline Maven plugin local-repository cache |
 | Artifact upload | `archiveArtifacts` |
 | `workflow_dispatch` | Parameters and a manual Build |
+| Full-profile verification | A separate `verify full profile` stage |
 
 An internal Jenkins installation additionally needs a Maven mirror and
 `settings.xml`: internal networks commonly cannot reach Maven Central

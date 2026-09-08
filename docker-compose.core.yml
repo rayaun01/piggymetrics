@@ -36,6 +36,7 @@ services:
       SPRING_PROFILES_ACTIVE: local
       SPRING_CLOUD_CONFIG_URI: http://config:8888
       REGISTRY_HOST: registry
+    restart: on-failure
     depends_on:
       - config
     ports:
@@ -46,10 +47,14 @@ services:
     environment:
       CONFIG_SERVICE_PASSWORD: ${CONFIG_SERVICE_PASSWORD:-password}
       MONGODB_PASSWORD: ${MONGODB_PASSWORD:-password}
+      ACCOUNT_SERVICE_PASSWORD: ${ACCOUNT_SERVICE_PASSWORD:-password}
+      STATISTICS_SERVICE_PASSWORD: ${STATISTICS_SERVICE_PASSWORD:-password}
+      NOTIFICATION_SERVICE_PASSWORD: ${NOTIFICATION_SERVICE_PASSWORD:-password}
       SPRING_PROFILES_ACTIVE: local
       SPRING_CLOUD_CONFIG_URI: http://config:8888
       MONGO_HOST: mongodb
       REGISTRY_HOST: registry
+    restart: on-failure
     depends_on:
       - config
       - registry
@@ -68,6 +73,7 @@ services:
       MONGO_HOST: mongodb
       AUTH_HOST: auth-service
       REGISTRY_HOST: registry
+    restart: on-failure
     depends_on:
       - config
       - registry
@@ -88,6 +94,7 @@ services:
       AUTH_HOST: auth-service
       REGISTRY_HOST: registry
       RATES_URL: http://rates-stub:18080
+    restart: on-failure
     depends_on:
       - config
       - registry
@@ -108,6 +115,7 @@ services:
       MONGO_HOST: mongodb
       AUTH_HOST: auth-service
       REGISTRY_HOST: registry
+    restart: on-failure
     depends_on:
       - config
       - registry
@@ -123,6 +131,7 @@ services:
       SPRING_PROFILES_ACTIVE: local
       SPRING_CLOUD_CONFIG_URI: http://config:8888
       REGISTRY_HOST: registry
+    restart: on-failure
     depends_on:
       - config
       - registry

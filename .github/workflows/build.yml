@@ -27,6 +27,7 @@ jobs:
         run: mvn -B -fae verify
 
       - name: Verify full profile
+        if: always()
         run: mvn -B -fae -Pfull verify
 
       - name: Upload Surefire reports

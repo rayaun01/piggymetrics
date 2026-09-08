@@ -70,10 +70,20 @@ The matching `mongo` shell must be at `/path/to/mongodb/bin/mongo`.
 T2 is the low-footprint container tier. It contains one MongoDB, seven Java
 services, and one rates stub:
 
-```bash
-docker compose -f docker-compose.core.yml config
-docker compose -f docker-compose.core.yml up
-```
+1. Build the Java artifacts with JDK 8 and the environment's Maven mirror:
+
+   ```bash
+   export JAVA_HOME=/usr/lib/jvm/temurin-8-jdk-amd64
+   export PATH="$JAVA_HOME/bin:$PATH"
+   mvn -s /home/ubuntu/repos/piggymetrics-baseline/settings-mirror.xml -B -fae package
+   ```
+
+2. Validate and start the core Compose tier:
+
+   ```bash
+   docker compose -f docker-compose.core.yml config
+   docker compose -f docker-compose.core.yml up
+   ```
 
 The services receive `MONGO_HOST=mongodb`, `AUTH_HOST=auth-service`,
 `REGISTRY_HOST=registry`, `RATES_URL=http://rates-stub:18080`,
@@ -85,10 +95,20 @@ The services receive `MONGO_HOST=mongodb`, `AUTH_HOST=auth-service`,
 T3 preserves the repository's original Java Compose tier, without the
 out-of-scope .NET services:
 
-```bash
-docker compose --env-file .env -f docker-compose.yml up -d
-docker compose --env-file .env -f docker-compose.yml -f docker-compose.dev.yml build
-```
+1. Build the full Java reactor with JDK 8 and the environment's Maven mirror:
+
+   ```bash
+   export JAVA_HOME=/usr/lib/jvm/temurin-8-jdk-amd64
+   export PATH="$JAVA_HOME/bin:$PATH"
+   mvn -s /home/ubuntu/repos/piggymetrics-baseline/settings-mirror.xml -B -fae -Pfull package
+   ```
+
+2. Build and start the full Compose tier:
+
+   ```bash
+   docker compose --env-file .env -f docker-compose.yml -f docker-compose.dev.yml build
+   docker compose --env-file .env -f docker-compose.yml up -d
+   ```
 
 The original full-stack measurements before this runbook were approximately
 **12,724.9 MiB** peak RSS for seven uncapped JVMs and **79.9 MiB** for

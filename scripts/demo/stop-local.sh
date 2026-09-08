@@ -5,7 +5,17 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 RUNTIME_DIR="${PIGGYMETRICS_RUNTIME_DIR:-$ROOT_DIR/.demo-runtime}"
 PID_DIR="$RUNTIME_DIR/pids"
 MONGO_DATA_DIR="${MONGO_DATA_DIR:-$RUNTIME_DIR/mongodb-data}"
-MONGO_BIN="${MONGO_BIN:-$ROOT_DIR/../piggymetrics-demo-harness/mongodb/bin/mongod}"
+MONGO_BIN="${MONGO_BIN:-mongod}"
+
+if [[ "$MONGO_BIN" == */* ]]; then
+  if [[ ! -x "$MONGO_BIN" ]]; then
+    echo "MONGO_BIN '$MONGO_BIN' was not found or is not executable; set MONGO_BIN to the mongod binary." >&2
+    exit 1
+  fi
+elif ! command -v "$MONGO_BIN" >/dev/null 2>&1; then
+  echo "MONGO_BIN '$MONGO_BIN' was not found on PATH; set MONGO_BIN to the mongod binary." >&2
+  exit 1
+fi
 
 if [[ -d "$PID_DIR" ]]; then
   for pid_file in "$PID_DIR"/*.pid; do
