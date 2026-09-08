@@ -2,8 +2,8 @@
 
 Named inputs are the module constants below: ``SYSTEM``, source/target Java
 versions and homes, the baseline/playbook paths, ``UNITS``, and
-``FIRST_BATCH``. Run with ``run_workflow`` using ``script_path`` set to
-``/home/ubuntu/repos/piggymetrics/.agents/workflows/uplift_migrate.py``.
+``FIRST_BATCH``. Run with ``run_workflow`` using ``script_path`` set to this
+file's absolute path in your checkout.
 An empty ``remainingUnits`` list does not mean the migration is done; the
 baseline diff and the golden-master re-run are what say that.
 
