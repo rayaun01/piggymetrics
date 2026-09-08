@@ -365,7 +365,7 @@ demo statistics row only exists after some write reaches
 | # | Risk | Anchored at | Why it bites |
 | --- | --- | --- | --- |
 | D-1 | The four-database split lives only in the `local` profile; the base config points every service at `database: piggymetrics` | `auth-service.yml:3-8`, `account-service.yml:12-17`, `statistics-service.yml:12-17`, `notification-service.yml:28-35` vs the four `*-local.yml:6-10` | Any re-platforming that changes how profiles are activated (Boot 3 config-data migration, `spring.config.import` for Config Server) silently collapses four logical databases into one on the consolidated MongoDB, where `accounts` then has two mappings (`statistics/.../Account.java:10`) |
-| D-2 | `BigDecimal` amounts vs seeded BSON doubles in the same field | `account/.../Item.java:15`, `Saving.java:9,15`, `timeseries/DataPoint.java:25,27`, `ItemMetric.java:16` vs `mongodb/dump/account-service-dump.js:57` (`"amount": 147.85`), `:92` (`"interest": 3.32`) | Spring Data MongoDB's default `BigDecimal` representation (String today, `Decimal128` under the newer `BigDecimalRepresentation` setting) differs from the seeded double. The same `accounts.expenses.amount` path therefore holds two BSON types, and changing the representation on upgrade breaks reads of already-stored documents. Read verification: [runtime item 1](#open-items-for-runtime-verification) |
+| D-2 | `BigDecimal` amounts vs seeded BSON doubles in the same field | `account/.../Item.java:15`, `Saving.java:9,15`, `timeseries/DataPoint.java:25,27`, `ItemMetric.java:16` vs `mongodb/dump/account-service-dump.js:57` (`"amount": 147.85`), `:92` (`"interest": 3.32`) | Spring Data MongoDB's default `BigDecimal` representation (String today, `Decimal128` under the newer `BigDecimalRepresentation` setting) differs from the seeded double. The same `accounts.expenses.amount` path therefore holds two BSON types, and changing the representation on upgrade breaks reads of already-stored documents. Partially confirmed at runtime — see [6.1](#61-runtime-evidence-for-d-2-and-d-11-observed) — and detectable with the query in [6.2](#62-detecting-the-mixed-type-condition-yourself); the stored BSON types themselves remain [runtime item 1](#open-items-for-runtime-verification) |
 | D-3 | `java.util.Date` everywhere, with day bucketing in the JVM default zone | `Account.java:20`, `DataPointId.java:12`, `NotificationSettings.java:14`; `StatisticsServiceImpl.java:53-54` (`LocalDate.now().atStartOfDay().atZone(ZoneId.systemDefault())`) | Moving to `java.time` changes the mapped BSON type and, more importantly, the `_id` value of `datapoints`: a container timezone change re-buckets the day and creates duplicate rows for the same account/day instead of overwriting |
 | D-4 | `Map<Currency, BigDecimal>` and `Map<StatisticMetric, BigDecimal>` keyed by enum name | `DataPoint.java:25`, `:27`; `Recipient.java:22` | Enum-name map keys become literal BSON field names, and the notification queries hard-code them (`RecipientRepository.java:15-21`). Renaming or reordering an enum constant (`Currency.java:5`, `StatisticMetric.java:5`, `NotificationType.java:5-6`) is a data-format change, and any key-mapping change on upgrade invalidates stored documents |
 | D-5 | Legacy `com.mongodb.DBObject`-based converters for the composite `_id`, plus enum→`int` converters | `DataPointIdWriterConverter.java:3-22`, `DataPointIdReaderConverter.java:3-19`, `FrequencyWriterConverter.java:8-13`, `FrequencyReaderConverter.java:8-13` | `DBObject`/`BasicDBObject` are legacy driver types (the modern equivalent is `org.bson.Document`); the converters must be ported, and the `CustomConversions` bean type they are registered with (`StatisticsApplication.java:32-40`, `NotificationServiceApplication.java:30-38`) is deprecated in favour of `MongoCustomConversions`. If they silently stop being applied, `datapoints._id` field order/shape changes and `scheduledNotifications.*.frequency` starts persisting as an enum name, which makes the `$where` queries in `RecipientRepository.java:15-21` match nothing |
@@ -375,6 +375,129 @@ demo statistics row only exists after some write reaches
 | D-9 | Bean-validation annotations move from `javax.*` to `jakarta.*`, and `org.hibernate.validator.constraints.Length`/`Email` are deprecated/removed | `Account.java:8-9,32`, `Item.java:3-5`, `Recipient.java:3-8`, `account/.../User.java:3-5` | These constraints are the only guard on stored field shapes (title ≤ 20 chars, note ≤ 20 000 chars, email format). Dropping one during the namespace migration widens what can be persisted without any test failing |
 | D-10 | Deprecated Jackson binding on persisted domain classes | `account/.../Account.java:3` and `statistics/.../Account.java:3` use `org.codehaus.jackson.annotate.JsonIgnoreProperties` (Jackson 1), while `ExchangeRatesContainer.java:3` uses `com.fasterxml.jackson.annotation` (Jackson 2) | Jackson 1 is absent from Boot 3. On removal, the `ignoreUnknown = true` behaviour is lost and account payloads carrying fields the target class lacks (e.g. `name`/`lastSeen`/`note` sent to statistics-service, `statistics/.../Account.java:12-24`) start failing deserialization at the service boundary |
 | D-11 | Unrounded aggregates and a `double`-derived divisor | `StatisticsServiceImpl.java:84-90` (no scale on `EXPENSES_AMOUNT`/`INCOMES_AMOUNT`/`SAVING_AMOUNT`), `ExchangeRatesServiceImpl.java:56-58`, `TimePeriod.java:7-16` (`new BigDecimal(baseRatio)` on `365.2425` etc.) | Stored statistic amounts have an unbounded, platform-dependent scale. If the `BigDecimal` representation changes to `Decimal128` (34 significant digits, D-2), values that round-trip today can throw on write or lose precision |
+
+### 6.1 Runtime evidence for D-2 and D-11 (observed)
+
+**Provenance: runtime observation reported to the author, not reproduced here.**
+Observed 2026-09-08 against the T1 stack at commit `d91f384`, after writing an
+income of 10 000 JPY and the `Tokyo` expense of 147.85 JPY through the API. Not
+verified by the author against a live instance; everything else in this document
+is read from source.
+
+```json
+// GET /accounts/current
+{"name":"wire1788889784","lastSeen":"2026-09-08T17:49:44.928+0000","expenses":[{"title":"Tokyo","amount":147.85,"currency":"JPY","period":"MONTH","icon":"travel"}], ...}
+// GET /statistics/current for the same account
+{"statistics":{"EXPENSES_AMOUNT":0.0330,"INCOMES_AMOUNT":2.2341,"SAVING_AMOUNT":0.6800},"rates":{"EUR":0.92,"JPY":147.85,"RUB":92.5,"USD":1}}
+```
+
+What this shows, and why it matters for D-2:
+
+- **Scale survives onto the wire.** `0.0330` and `0.6800` keep their trailing
+  zeros — these are scale-4 `BigDecimal`s produced by the two rounding sites
+  (`StatisticsServiceImpl.java:105-107`, `ExchangeRatesServiceImpl.java:56`),
+  serialised with their scale intact rather than as `0.033`/`0.68`. In the same
+  response, `rates.USD` is `1` at scale 0 — it comes straight from the rates
+  payload and never passes through a `divide(..., 4, HALF_UP)`
+  (`ExchangeRatesServiceImpl.java:56-58`). So one document holds values of
+  differing scale in the same map (`DataPoint.java:25`, `:27`), and the scale is
+  part of the observable output, not an internal detail.
+- **The arithmetic is reproducible from source.** With the stub rate
+  `"JPY": 147.85` (`scripts/demo/rates-stub.py:20-24`) and `MONTH` base ratio
+  `30.4368` (`TimePeriod.java:7-16`): `10000 × (1/147.85)` rounded to 4 dp, then
+  `÷ 30.4368` at 4 dp `HALF_UP`, gives the observed `2.2341`; the 147.85 JPY
+  expense gives `0.0330`. This is the code path in D-11 producing values whose
+  scale is set entirely by those two `divide` calls.
+- **A representation change is therefore observable in the HTTP response text,
+  not only in the database.** Anything that alters how `BigDecimal` is mapped or
+  serialised (the Spring Data `BigDecimalRepresentation` setting, a Jackson
+  upgrade, `Decimal128` storage) changes these strings, so D-2 and D-11 can be
+  regression-tested at the API boundary during the upgrade — e.g. by asserting on
+  `"EXPENSES_AMOUNT":0.0330` rather than on a parsed number.
+- **`datapoints._id` was observed as a nested object, not a string**, which is
+  what the writer converter builds field-by-field
+  (`DataPointIdWriterConverter.java:17-22`, section 3) — so the composite key is
+  visible in output too, and D-3/D-5 changes to its shape or field order are
+  detectable the same way.
+
+Note what this evidence does **not** establish: the account response echoing
+`"amount":147.85` says nothing about the BSON type stored underneath it, because
+both a BSON `double` and a Spring-Data-written `BigDecimal` can serialise to the
+same JSON number. The stored types still need the query below.
+
+### 6.2 Detecting the mixed-type condition yourself
+
+The reusable part of the D-2/D-6 finding is a check that reports the BSON type
+*distribution* within one collection, rather than sampling a single document.
+Run in `mongosh` against a database that has been both seeded
+(`mongodb/dump/account-service-dump.js`) and API-written. **Read-only.** Written
+from the schema in section 2; not executed against the demo data.
+
+```js
+use piggymetrics_accounts
+// BSON type distribution across every item amount in the collection
+db.accounts.aggregate([
+  { $project: { amounts: { $concatArrays: [
+      { $ifNull: ["$expenses.amount", []] },
+      { $ifNull: ["$incomes.amount", []] } ] } } },
+  { $unwind: "$amounts" },
+  { $group: { _id: { $type: "$amounts" }, count: { $sum: 1 } } },
+  { $sort: { count: -1 } }
+])
+```
+
+Expected on a seeded **and** API-written database — two types in one field path,
+which is the whole point:
+
+```js
+[ { _id: 'double', count: 10 },   // the seeded demo row: 8 expenses + 2 incomes, raw JSON numbers
+  { _id: 'string', count: 2 } ]   // Spring Data's default BigDecimal representation (Boot 2.0)
+```
+
+A single-type result means the database is not in the mixed state: only `double`
+⇒ seed data only; only `string` (or only `decimal`, if the representation has
+been switched to `Decimal128`) ⇒ Java writes only. Any appearance of both, or of
+`decimal` alongside either, is the D-2 condition.
+
+The `_class` presence check (D-6), same shape — the seed path writes no `_class`,
+the Spring Data path always does:
+
+```js
+db.accounts.aggregate([
+  { $group: { _id: { hasClass: { $ne: [ { $type: "$_class" }, "missing" ] } },
+              count: { $sum: 1 },
+              ids: { $push: "$_id" },
+              classes: { $addToSet: "$_class" } } }
+])
+```
+
+Expected: one group with `hasClass: false` whose `ids` contain `"demo"` and whose
+`classes` is `[]`, and one with `hasClass: true` whose `classes` is exactly
+`[ 'com.piggymetrics.account.domain.Account' ]`. A second class name — in
+particular `com.piggymetrics.statistics.domain.Account` — means the duplicate
+mapping (`statistics/.../Account.java:10`) has started writing this collection.
+
+Equivalent per-document loop, useful when you want the offending titles rather
+than counts (note `typeof` reports `Decimal128` and `ObjectId` alike as
+`'object'`, so prefer the `$type` aggregation above for classification):
+
+```js
+db.accounts.find({}, { expenses: 1, incomes: 1, _class: 1 }).forEach(d =>
+  [...(d.expenses || []), ...(d.incomes || [])].forEach(i =>
+    print([d._id, d._class || '<no _class>', i.title, typeof i.amount, i.amount].join('\t'))));
+```
+
+To scan every logical database at once (also covers D-1/D-7, where documents
+turn up in a database that should not have them):
+
+```js
+["piggymetrics_accounts", "piggymetrics"].forEach(name => {
+  const sdb = db.getSiblingDB(name);
+  if (sdb.getCollectionNames().includes("accounts")) {
+    print(`${name}.accounts: ${sdb.accounts.countDocuments({})} docs`);
+  }
+});
+```
 
 ## Open items for runtime verification
 
