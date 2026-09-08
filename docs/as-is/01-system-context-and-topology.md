@@ -73,10 +73,10 @@ flowchart LR
     gateway -->|"/statistics/** via Eureka"| statistics
     gateway -->|"/notifications/** via Eureka"| notification
 
-    account -->|Feign POST /uaa/users| auth
-    account -->|Feign PUT /statistics/{acct}| statistics
-    notification -->|Feign GET /accounts/{acct}| account
-    statistics -->|Feign GET /latest?base=USD| rates
+    account -->|"Feign POST /uaa/users"| auth
+    account -->|"Feign PUT /statistics/#123;acct#125;"| statistics
+    notification -->|"Feign GET /accounts/#123;acct#125;"| account
+    statistics -->|"Feign GET /latest?base=USD"| rates
     notification --> smtp
 
     auth --- authdb
