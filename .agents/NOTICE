@@ -1,0 +1,18 @@
+This directory adapts material from the Apache-2.0 licensed
+code-modernization plugin at:
+
+https://github.com/anthropics/claude-plugins-official
+
+Source path: `plugins/code-modernization`.
+
+The material has been modified for a repository-local Java 8 to modern-Java
+modernization method kit: upstream commands became skills, specialist agents
+became role briefs, and two orchestration workflows became deterministic
+Python scripts. Product branding and installation mechanics were removed.
+
+Date of this modification: 2026-09-08.
+
+The upstream `LICENSE` has no copyright-holder line; its appendix is the
+unfilled Apache boilerplate. This NOTICE therefore records the source and
+adaptation explicitly. The complete Apache-2.0 text is in
+`.agents/LICENSE-APACHE-2.0`.
