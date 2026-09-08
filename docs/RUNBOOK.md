@@ -9,11 +9,15 @@ T0 is the smallest repeatable check. It runs the default seven-module core
 reactor:
 
 ```bash
-JAVA_HOME=/usr/lib/jvm/temurin-8-jdk-amd64 mvn -B -fae test
+export JAVA_HOME=/path/to/jdk8   # e.g. /usr/lib/jvm/temurin-8-jdk-amd64
+mvn -B -fae test
 ```
 
 The repository enforces JDK 8 through maven-enforcer, so the build fails fast on
-any other JDK rather than producing Java 8-incompatible bytecode.
+any other JDK rather than producing Java 8-incompatible bytecode. Every Maven
+command below assumes `JAVA_HOME` points at a JDK 8; the path above is an
+example, not a fixed location. The environment blueprint installs Temurin 8 at
+`/usr/lib/jvm/temurin-8-jdk-amd64`.
 
 GitHub-hosted CI reaches Maven Central directly. Networks that cannot (Maven
 Central rate-limits some environments with HTTP 429, and corporate networks
@@ -78,7 +82,7 @@ services, and one rates stub:
 1. Build the Java artifacts with JDK 8:
 
    ```bash
-   JAVA_HOME=/usr/lib/jvm/temurin-8-jdk-amd64 mvn -B package
+   mvn -B package
    ```
 
    The Dockerfiles `ADD target/*.jar`, so this step is mandatory on a fresh
@@ -106,7 +110,7 @@ out-of-scope .NET services:
 1. Build the full Java reactor with JDK 8:
 
    ```bash
-   JAVA_HOME=/usr/lib/jvm/temurin-8-jdk-amd64 mvn -B -Pfull package
+   mvn -B -Pfull package
    ```
 
 2. Build and start the full Compose tier:
