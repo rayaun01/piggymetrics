@@ -1,0 +1,136 @@
+services:
+  mongodb:
+    image: mongo:7.0
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGODB_PASSWORD:-password}
+      MONGODB_PASSWORD: ${MONGODB_PASSWORD:-password}
+    ports:
+      - "27017:27017"
+    volumes:
+      - core-mongodb-data:/data/db
+      - ./mongodb/init/01-users.js:/docker-entrypoint-initdb.d/01-users.js:ro
+      - ./mongodb/dump/account-service-dump.js:/docker-entrypoint-initdb.d/20-account-service-dump.js:ro
+
+  rates-stub:
+    image: python:3.12-slim
+    command: ["python", "/app/rates-stub.py"]
+    volumes:
+      - ./scripts/demo/rates-stub.py:/app/rates-stub.py:ro
+    ports:
+      - "18080:18080"
+
+  config:
+    build: ./config
+    environment:
+      CONFIG_SERVICE_PASSWORD: ${CONFIG_SERVICE_PASSWORD:-password}
+      SPRING_PROFILES_ACTIVE: local,native
+    ports:
+      - "8888:8888"
+
+  registry:
+    build: ./registry
+    environment:
+      CONFIG_SERVICE_PASSWORD: ${CONFIG_SERVICE_PASSWORD:-password}
+      SPRING_PROFILES_ACTIVE: local
+      SPRING_CLOUD_CONFIG_URI: http://config:8888
+      REGISTRY_HOST: registry
+    depends_on:
+      - config
+    ports:
+      - "8761:8761"
+
+  auth-service:
+    build: ./auth-service
+    environment:
+      CONFIG_SERVICE_PASSWORD: ${CONFIG_SERVICE_PASSWORD:-password}
+      MONGODB_PASSWORD: ${MONGODB_PASSWORD:-password}
+      SPRING_PROFILES_ACTIVE: local
+      SPRING_CLOUD_CONFIG_URI: http://config:8888
+      MONGO_HOST: mongodb
+      REGISTRY_HOST: registry
+    depends_on:
+      - config
+      - registry
+      - mongodb
+    ports:
+      - "5000:5000"
+
+  account-service:
+    build: ./account-service
+    environment:
+      CONFIG_SERVICE_PASSWORD: ${CONFIG_SERVICE_PASSWORD:-password}
+      MONGODB_PASSWORD: ${MONGODB_PASSWORD:-password}
+      ACCOUNT_SERVICE_PASSWORD: ${ACCOUNT_SERVICE_PASSWORD:-password}
+      SPRING_PROFILES_ACTIVE: local
+      SPRING_CLOUD_CONFIG_URI: http://config:8888
+      MONGO_HOST: mongodb
+      AUTH_HOST: auth-service
+      REGISTRY_HOST: registry
+    depends_on:
+      - config
+      - registry
+      - auth-service
+      - mongodb
+    ports:
+      - "6000:6000"
+
+  statistics-service:
+    build: ./statistics-service
+    environment:
+      CONFIG_SERVICE_PASSWORD: ${CONFIG_SERVICE_PASSWORD:-password}
+      MONGODB_PASSWORD: ${MONGODB_PASSWORD:-password}
+      STATISTICS_SERVICE_PASSWORD: ${STATISTICS_SERVICE_PASSWORD:-password}
+      SPRING_PROFILES_ACTIVE: local
+      SPRING_CLOUD_CONFIG_URI: http://config:8888
+      MONGO_HOST: mongodb
+      AUTH_HOST: auth-service
+      REGISTRY_HOST: registry
+      RATES_URL: http://rates-stub:18080
+    depends_on:
+      - config
+      - registry
+      - auth-service
+      - mongodb
+      - rates-stub
+    ports:
+      - "7000:7000"
+
+  notification-service:
+    build: ./notification-service
+    environment:
+      CONFIG_SERVICE_PASSWORD: ${CONFIG_SERVICE_PASSWORD:-password}
+      MONGODB_PASSWORD: ${MONGODB_PASSWORD:-password}
+      NOTIFICATION_SERVICE_PASSWORD: ${NOTIFICATION_SERVICE_PASSWORD:-password}
+      SPRING_PROFILES_ACTIVE: local
+      SPRING_CLOUD_CONFIG_URI: http://config:8888
+      MONGO_HOST: mongodb
+      AUTH_HOST: auth-service
+      REGISTRY_HOST: registry
+    depends_on:
+      - config
+      - registry
+      - auth-service
+      - mongodb
+    ports:
+      - "8000:8000"
+
+  gateway:
+    build: ./gateway
+    environment:
+      CONFIG_SERVICE_PASSWORD: ${CONFIG_SERVICE_PASSWORD:-password}
+      SPRING_PROFILES_ACTIVE: local
+      SPRING_CLOUD_CONFIG_URI: http://config:8888
+      REGISTRY_HOST: registry
+    depends_on:
+      - config
+      - registry
+      - auth-service
+      - account-service
+      - statistics-service
+      - notification-service
+    ports:
+      - "4000:4000"
+
+volumes:
+  core-mongodb-data:

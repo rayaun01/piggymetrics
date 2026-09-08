@@ -3,6 +3,7 @@ package com.piggymetrics.statistics.client;
 import com.piggymetrics.statistics.domain.Currency;
 import com.piggymetrics.statistics.domain.ExchangeRatesContainer;
 import org.junit.Test;
+import org.junit.ClassRule;
 import org.junit.runner.RunWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -16,6 +17,9 @@ import static org.junit.Assert.assertNotNull;
 @RunWith(SpringRunner.class)
 @SpringBootTest
 public class ExchangeRatesClientTest {
+
+	@ClassRule
+	public static final ExchangeRatesTestServer RATES_SERVER = new ExchangeRatesTestServer();
 
 	@Autowired
 	private ExchangeRatesClient client;

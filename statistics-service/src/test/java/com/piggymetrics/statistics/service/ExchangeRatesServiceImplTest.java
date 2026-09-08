@@ -36,7 +36,8 @@ public class ExchangeRatesServiceImplTest {
 		ExchangeRatesContainer container = new ExchangeRatesContainer();
 		container.setRates(ImmutableMap.of(
 				Currency.EUR.name(), new BigDecimal("0.8"),
-				Currency.RUB.name(), new BigDecimal("80")
+				Currency.RUB.name(), new BigDecimal("80"),
+				Currency.JPY.name(), new BigDecimal("147.85")
 		));
 
 		when(client.getRates(Currency.getBase())).thenReturn(container);
@@ -55,7 +56,8 @@ public class ExchangeRatesServiceImplTest {
 		ExchangeRatesContainer container = new ExchangeRatesContainer();
 		container.setRates(ImmutableMap.of(
 				Currency.EUR.name(), new BigDecimal("0.8"),
-				Currency.RUB.name(), new BigDecimal("80")
+				Currency.RUB.name(), new BigDecimal("80"),
+				Currency.JPY.name(), new BigDecimal("147.85")
 		));
 
 		when(client.getRates(Currency.getBase())).thenReturn(container);
@@ -75,7 +77,8 @@ public class ExchangeRatesServiceImplTest {
 		ExchangeRatesContainer container = new ExchangeRatesContainer();
 		container.setRates(ImmutableMap.of(
 				Currency.EUR.name(), new BigDecimal("0.8"),
-				Currency.RUB.name(), new BigDecimal("80")
+				Currency.RUB.name(), new BigDecimal("80"),
+				Currency.JPY.name(), new BigDecimal("147.85")
 		));
 
 		when(client.getRates(Currency.getBase())).thenReturn(container);

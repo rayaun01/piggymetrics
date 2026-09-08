@@ -1,0 +1,5 @@
+spring:
+  data:
+    mongodb:
+      host: ${MONGO_HOST:localhost}
+      database: piggymetrics_auth

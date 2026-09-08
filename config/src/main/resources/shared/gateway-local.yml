@@ -1,0 +1,4 @@
+zuul:
+  routes:
+    auth-service:
+      url: http://${AUTH_HOST:localhost}:5000

@@ -38,6 +38,7 @@ public class ExchangeRatesServiceImpl implements ExchangeRatesService {
 
 		return ImmutableMap.of(
 				Currency.EUR, container.getRates().get(Currency.EUR.name()),
+				Currency.JPY, container.getRates().get(Currency.JPY.name()),
 				Currency.RUB, container.getRates().get(Currency.RUB.name()),
 				Currency.USD, BigDecimal.ONE
 		);

@@ -4,7 +4,9 @@
 
 print('dump start');
 
-db.accounts.update(
+db = db.getSiblingDB('piggymetrics_accounts');
+
+db.accounts.replaceOne(
     { "_id": "demo" },
     {
     "_id": "demo",
@@ -52,6 +54,13 @@ db.accounts.update(
             "icon": "phone",
             "period": "MONTH",
             "title": "Phone"
+        },
+        {
+            "amount": 147.85,
+            "currency": "JPY",
+            "icon": "travel",
+            "period": "MONTH",
+            "title": "Tokyo"
         },
         {
             "amount": 700,
