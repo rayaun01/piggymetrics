@@ -110,21 +110,22 @@ The interactive topology viewer is deliberately not ported or replaced.
 Four of the six upstream orchestration scripts are not ported, so the
 associated skills fall back to sequential delegation.
 
-## 11. Known repo-state gaps
+## 11. Repo-state notes
 
-The instructions currently outrun the repository; that is a repository defect,
-not a kit assumption:
+The kit's cited paths resolve on this branch. What remains is stated so nobody
+mistakes an intentional gap for an oversight:
 
-- The four `docs/as-is/` artifacts are currently on open PRs against the Stage
-  0 branch; the cited paths resolve after those changes merge. `docs/RUNBOOK.md`
-  is already present on this branch and supplies the runbook facts.
-- No `stage-0-baseline` tag exists yet.
+- The four `docs/as-is/` artifacts (`01`, `03`, `04`, `05`) are present, and
+  `docs/RUNBOOK.md` supplies the run-tier facts. `docs/as-is/` numbering skips
+  `02` deliberately: the runtime call graph was folded into `01` rather than
+  written separately.
+- `stage-0-baseline` tags the frozen baseline. Every stage branches from that
+  tag and is diffed against it.
 - `master` is not a usable oracle: it predates the Stage 0 harness, its test
   suite does not pass, its Mongo image cannot build, and its front end is
-  broken. The Stage 0 tip and its eventual tag are the real frozen baseline.
-- `docs/as-is/` numbering skips `02`.
+  broken. This is why the baseline is the tag, not the default branch.
 - `docs/modernization/` does not exist yet; the uplift artifacts are its
-  outputs.
+  outputs, created by the skills rather than checked in ahead of them.
 
 ## 12. License pointer
 
