@@ -141,7 +141,7 @@ migration work:
 | Artifact | Versions present | Note |
 | --- | --- | --- |
 | `org.codehaus.jackson:jackson-core-asl` | `1.9.2`, `1.9.13` | **The one that matters.** Jackson **1.x** is a dead library (superseded by `com.fasterxml.jackson` in 2012), present at *two* versions, alongside Jackson `2.9.6`. It is not purely transitive noise — it reaches the source: `account-service/src/main/java/com/piggymetrics/account/domain/Account.java:3` and `statistics-service/src/main/java/com/piggymetrics/statistics/domain/Account.java:3` both `import org.codehaus.jackson.annotate.JsonIgnoreProperties`, i.e. the **Jackson 1.x** annotation, on domain types that Jackson **2.x** serializes. |
-| `org.codehaus.jackson:jackson-mapper-asl` | `1.9.2`, `1.9.13` | Same. |
+| `org.codehaus.jackson:jackson-mapper-asl` | `1.9.2`, `1.9.13` | Same. See (f) below — this pair has a behavioural consequence, not just a hygiene one. |
 | `com.google.guava:guava` | `15.0`, `16.0`, `19.0` | Confirms the suspicion in §6: the local `19.0` pin (`statistics-service/pom.xml:63-67`) sits over two older versions the Netflix stack drags in. |
 | `com.jayway.jsonpath:json-path` | `2.2.0`, `2.4.0` | The local test pin (§1.1) versus the BOM value, both present. |
 | `net.minidev:json-smart` | `2.2.1`, `2.3` | Follows json-path. |
@@ -153,10 +153,61 @@ Maven mediation picks one version per artifact per module, so the divergence is 
 latent when the upgrades move these libraries: the Netflix retirement (S2) removes the older side of most of these
 pairs, which is a *benefit* of doing S2 before the version jumps, not merely a cost.
 
-**(c) No JWT library is present.** No `io.jsonwebtoken:*` artifact appears anywhere in the resolved runtime graph. The
+**(c) Two reactive stacks, and a split-groupId RxNetty.** `io.reactivex:rxnetty` / `rxnetty-contexts` / `rxnetty-servo`
+resolve to `0.4.9` across seven modules, while **`com.netflix.rxnetty:rx-netty` `0.3.18`** — a *different groupId at a
+much older version* — resolves into `turbine-stream-service` alongside them. This is not Maven mediation failing; the
+two coordinates are distinct artifacts, so mediation never considers them together and both land on the classpath with
+overlapping packages. Nothing in this repo asks for either. It is one more reason the Turbine module is a deletion
+candidate rather than a migration target, and a reminder that "same library, different groupId" divergence is invisible
+to any tooling that dedupes on coordinate.
+
+**(d) `feign-hystrix 9.5.1` is present, so a dead Feign fallback is a *configuration* fact, not a missing dependency.**
+`io.github.openfeign:feign-hystrix 9.5.1` resolves into account, statistics and notification. Two clients declare a
+fallback — `account-service/.../client/StatisticsServiceClient.java:10` and
+`statistics-service/.../client/ExchangeRatesClient.java:10` — but `feign.hystrix.enabled: true` is set only for
+`account-service` (`config/src/main/resources/shared/account-service.yml:24-26`). `statistics-service` has no such key,
+and the property defaults to false, so `ExchangeRatesClientFallback` is **never wired**: the resilience it looks like it
+provides does not exist. The artifact being present is what makes this diagnosable — the gap is one line of YAML, not a
+classpath problem.
+
+**(e) No JWT library is present.** No `io.jsonwebtoken:*` artifact appears anywhere in the resolved runtime graph. The
 baseline uses opaque OAuth2 tokens checked against `auth-service` (`CustomUserInfoTokenServices` in the resource-server
 configs), not JWTs. Any Spring Authorization Server design at S2 should treat "introduce JWTs" as a **new capability**
 with its own decision, not as a like-for-like port.
+
+**(f) An inert `@JsonIgnoreProperties` — the register's clearest argument for capturing golden masters before any
+dependency work.** Both `Account` domain classes carry the annotation, imported from **Jackson 1.x**:
+
+```java
+// account-service/src/main/java/com/piggymetrics/account/domain/Account.java:3,14
+// statistics-service/src/main/java/com/piggymetrics/statistics/domain/Account.java:3
+import org.codehaus.jackson.annotate.JsonIgnoreProperties;
+
+@Document(collection = "accounts")
+@JsonIgnoreProperties(ignoreUnknown = true)
+public class Account { … }
+```
+
+All serialization is done by Jackson **2.9.6** (§1.2, all nine modules), which reads only
+`com.fasterxml.jackson.annotation` annotations. It never sees this one. **The annotation does nothing today.**
+
+What makes it the sharpest item in the register is that the *obvious* fix — rewrite the import to
+`com.fasterxml.jackson.annotation.JsonIgnoreProperties` — is not behaviour-preserving, and its effect differs by call
+path:
+
+| Path | `FAIL_ON_UNKNOWN_PROPERTIES` today | Effect of porting the import |
+| --- | --- | --- |
+| The running services (Boot's auto-configured `ObjectMapper`) | **disabled** by Boot — "`DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES` is disabled" (<https://docs.spring.io/spring-boot/docs/2.0.3.RELEASE/reference/htmlsingle/#howto-customize-the-jackson-objectmapper>) | none — unknown properties are already ignored, so the annotation is *redundant* here |
+| The controller tests, which build their own mapper: `private static final ObjectMapper mapper = new ObjectMapper();` (`account-service/src/test/java/com/piggymetrics/account/controller/AccountControllerTest.java:32`, and the same line in the auth, statistics and notification controller tests) | **enabled** — Jackson's own default, since Boot's customizations do not apply to a hand-constructed mapper | **behaviour changes**: payloads with unknown properties that throw today would start deserializing silently |
+
+So the one-line "tidy the import" diff is inert in production and semantically load-bearing in the test suite — the exact
+opposite of what a reviewer would assume, and invisible in the diff itself. Deleting the import and the annotation
+outright is the behaviour-preserving option; porting it is a behaviour change that needs its own decision.
+
+This is why golden masters (recorded request/response captures, plus a green baseline suite) must exist **before** stage
+1 rather than being produced alongside it: the repo already contains a change that looks like cleanup and is not, and
+nothing but a recorded before/after can distinguish them. Handling: leave the import alone through S1-S3 (harmless while
+dead), then treat it as its own change once the Codehaus artifacts are confirmed gone from the graph after S2.
 
 **Resolved versions of the migration-order shortlist** (all `[RESOLVED]`; module counts as reported by the run):
 
@@ -178,6 +229,13 @@ with its own decision, not as a like-for-like port.
 | `com.netflix.zuul:zuul-core` | `1.3.1` | gateway only |
 | `junit:junit` | `4.12` | test scope |
 | `org.mockito:mockito-core` | `2.15.0` | test scope |
+| `io.reactivex:rxjava` | `1.3.8` (single version — the Boot BOM value wins over Netflix's `1.2.0`) | all eight non-config modules |
+| `io.reactivex:rxjava-reactive-streams` | `1.2.1` | gateway, account, turbine-stream |
+| `io.reactivex:rxnetty` / `rxnetty-contexts` / `rxnetty-servo` | `0.4.9` | 7 |
+| `io.projectreactor:reactor-core` | `3.1.8.RELEASE` | account, statistics, notification, turbine-stream |
+| `io.projectreactor.ipc:reactor-netty` | `0.7.8.RELEASE` | turbine-stream |
+| `org.springframework.boot:spring-boot-starter-reactor-netty` | `2.0.3.RELEASE` | turbine-stream |
+| `io.github.openfeign:feign-hystrix` | `9.5.1` | account, statistics, notification |
 | `org.mongodb:bson` / `mongodb-driver` / `mongodb-driver-core` | `3.6.4` | auth, account, statistics, notification |
 | `org.springframework.boot:spring-boot` | `2.0.3.RELEASE` | all nine |
 | **every** `org.springframework.cloud:*` artifact | `2.0.0.RELEASE` | incl. `-netflix-zuul` (gateway), `-netflix-hystrix-dashboard` (monitoring), `-netflix-hystrix-stream` (account/statistics/notification), `-netflix-turbine-stream` (turbine-stream), `-netflix-ribbon` (8), `-netflix-eureka-client` (7) / `-eureka-server` (registry), `-security` and `-starter-oauth2` (the four secured services), `-sleuth-core` (5), `-stream` / `-stream-binder-rabbit` / `-starter-stream-rabbit` / `-starter-bus-amqp` (account/statistics/notification + turbine-stream), `-openfeign-core` (3), `-config-server` (config) / `-config-client` (all nine) |
@@ -451,7 +509,7 @@ None of these are declared anywhere in the repo; all are forced to move by the B
 
 | Library | Now (Boot 2.0.3) | Boot 2.3.12 | Boot 2.7.18 | Boot 3.0.13 | Why it matters here |
 | --- | --- | --- | --- | --- | --- |
-| **Jackson 1.x** (`org.codehaus.jackson:jackson-core-asl` / `-mapper-asl`) | `1.9.2` **and** `1.9.13` both present `[RESOLVED]` (§1.2) | — | — | — | Dead since 2012, unmaintained, and *used in source*: two `Account` domain classes import `org.codehaus.jackson.annotate.JsonIgnoreProperties` while Jackson 2.x does the actual serialization — so the annotation is silently ignored today. Nothing upgrades it; the import must be switched to `com.fasterxml.jackson.annotation.JsonIgnoreProperties` and the transitive copies must be confirmed gone after the S2 Netflix retirement. Cheap fix, latent behaviour change (the annotation starts taking effect), so do it deliberately and not during a version bump. |
+| **Jackson 1.x** (`org.codehaus.jackson:jackson-core-asl` / `-mapper-asl`) | `1.9.2` **and** `1.9.13` both present `[RESOLVED]` (§1.2) | — | — | — | Dead since 2012, unmaintained, and *used in source*: two `Account` domain classes import `org.codehaus.jackson.annotate.JsonIgnoreProperties` while Jackson 2.x does the actual serialization — so the annotation is silently ignored today. Nothing upgrades it. Do **not** treat rewriting the import as a cleanup — see §1.2(f): it is inert in the running services (Boot disables `FAIL_ON_UNKNOWN_PROPERTIES`) but load-bearing in the four controller tests that construct their own `ObjectMapper`. Deleting the annotation preserves behaviour; porting it does not. Confirm the transitive copies are gone after the S2 retirement. |
 | Jackson 2.x | `2.9.6` `[RESOLVED]` (§1.2) | `2.11.4` | `2.13.5` | `2.14.3` | Every REST payload and every Mongo document mapping. 2.9→2.10+ tightens polymorphic-type handling and changes `java.time`/`Date` serialization defaults — visible in `ExchangeRatesContainer.date` (a `LocalDate` field) and in `Account.lastSeen` (`java.util.Date`). Also clears the 2.9.x deserialization CVE family. |
 | Tomcat (embedded) | `8.5.31` | `9.0.46` | `9.0.83` | **`10.1.16`** | Tomcat 10 is the `jakarta.servlet` cut. This is the mechanical reason no `javax.servlet`-based library (i.e. `spring-security-oauth2`) can survive into Boot 3. |
 | Spring Framework | `5.0.7.RELEASE` | `5.2.15.RELEASE` | `5.3.31` | **`6.0.14`** | Spring 6 requires Java 17 and drops `javax`. `WebSecurityConfigurerAdapter`, used by the security configs in auth/account/statistics/notification, is deprecated in 5.7 and **removed** in Spring Security 6. |
@@ -461,7 +519,8 @@ None of these are declared anywhere in the repo; all are forced to move by the B
 | MongoDB driver | `3.6.4` | `4.0.6` | `4.6.1` | `4.8.2` | The 3.x→4.x driver rewrite is the single most disruptive transitive change before Boot 3: it breaks the pinned `flapdoodle 1.50.3` (§2) and changes `MongoTemplate` behaviour used across four services. |
 | Hibernate Validator | `6.0.10.Final` | `6.1.7.Final` | `6.2.5.Final` | **`8.0.1.Final`** | HV 8 implements Jakarta Validation 3.0 — the runtime half of §4.1. |
 | Jakarta/Javax Mail | `com.sun.mail:javax.mail 1.6.1` | Javax `1.6.2` + Jakarta `1.6.7` | Javax `1.6.2` + Jakarta `1.6.7` | **Jakarta Mail `2.1.2` only** | The runtime half of §4.2. |
-| RxJava | Boot BOM declares `1.3.8`, Spring Cloud Netflix BOM declares `1.2.0` — **mediation result still unknown** `[UNRESOLVED]` (RxJava was not in the resolved shortlist reported in §1.2) | — | — | absent | Hystrix's reactive core. Disappears entirely with the Hystrix retirement; listed because the conflicting BOM declarations mean nobody currently knows which version runs. Resolve with the tree command in the open-items section. |
+| RxJava | `1.3.8`, single version across all eight non-config modules `[RESOLVED]` (§1.2) — the Boot BOM's `1.3.8` wins the mediation against the Spring Cloud Netflix BOM's `1.2.0` | — | — | absent | Hystrix's reactive core. No divergence after all, and it disappears entirely with the Hystrix retirement (S2) rather than needing an upgrade. |
+| Reactor | `reactor-core 3.1.8.RELEASE` (account, statistics, notification, turbine-stream); `reactor-netty 0.7.8.RELEASE` + `spring-boot-starter-reactor-netty 2.0.3.RELEASE` (turbine-stream only) `[RESOLVED]` (§1.2) | Boot-managed | Boot-managed | Boot-managed (Reactor 2022.x) | Not used by application code; pulled in by the stream/Turbine path. Moves with Boot on its own. The `turbine-stream-service`-only Netty server disappears with that module. |
 | Archaius / eureka-core / hystrix-core / ribbon-core / zuul-core (`0.7.6` / `1.9.2` / `1.5.12` / `2.2.5` / `1.3.1`) | present | present | Eureka only | Eureka only | The Netflix internals behind the starters; they vanish with §2's retirements (except Eureka's). |
 | Guava (transitive, via Netflix stack) | **`15.0`, `16.0` and `19.0` all present in the reactor** `[RESOLVED]` (§1.2), against the local `19.0` pin (`statistics-service/pom.xml:63-67`) | — | — | — | Confirmed divergence, not a suspicion: the Netflix stack brings 15.0/16.0 while `statistics-service` pins 19.0. Most of the old side disappears with the S2 Netflix retirement. |
 
@@ -517,8 +576,9 @@ a concrete command.
    JAVA_HOME=/path/to/jdk8 PATH="$JAVA_HOME/bin:$PATH" \
      mvn -B -Pfull dependency:list -DoutputFile=/tmp/deplist.txt -DappendOutput=true
    ```
-   Mostly **closed** by the external resolution in §1.2. Still open on this box: the RxJava mediation result
-   (`1.2.0` vs `1.3.8`) and the Reactor Core child version, neither of which appeared in the reported shortlist.
+   **Closed** by the external resolution in §1.2 for every artifact this register names, including the RxJava mediation
+   (`1.3.8`) and the Reactor versions. Re-run it after each stage, not to fill a gap, but to confirm the divergence in
+   §1.2(b) actually shrinks as the Netflix stack leaves.
 
 2. **Baseline green build on JDK 8** — establishes the "before" state the migration is measured against.
    ```bash
@@ -568,9 +628,6 @@ a concrete command.
    A 200 here means the tier is merely unexposed (still delete it, but the S2 note should say "disabled", not "never
    worked"); a 404 means it is genuinely absent.
 
-9. **RxJava mediation and Reactor Core** — the two artifacts the external resolution did not report (§6). Re-run the
-   §open-item-1 tree with `-Dincludes=io.reactivex:*,io.projectreactor:*`.
-
-10. **Whether `spring-security-oauth2-autoconfigure 2.6.8` actually runs on Boot 2.7** — the register states only the
+9. **Whether `spring-security-oauth2-autoconfigure 2.6.8` actually runs on Boot 2.7** — the register states only the
    evidenced fact (no GA build targets 2.7). If a fallback is ever considered, it needs an explicit smoke test of
    `auth-service` on Boot 2.7 with the 2.6.8 artifact before anyone relies on it.
