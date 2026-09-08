@@ -3,8 +3,11 @@
 Reverse-engineered from the branch `devin/1788845133-stage-0-demo-harness` by
 reading every `@RestController` in the Java modules, the `@PreAuthorize`
 annotations, the OAuth2 configuration in `auth-service`, the shared config YAML
-and the Zuul route table. Citations are inline as `path:line`. No endpoint was
-called: nothing here is an observed response — see
+and the Zuul route table. Every claim is derived from the code and cited inline
+as `path:line`, **except** the endpoint and payload observations explicitly
+marked as such in §1.1, §3 and §4.1–§4.3: those were observed on a running T1
+stack on 2026-09-08 at commit `d91f384`, and each carries that attribution
+locally. T2 and T3 were never observed; what remains unchecked is listed in
 [Open items for runtime verification](#open-items-for-runtime-verification).
 
 ## 0. How a browser path becomes a service path
@@ -59,7 +62,7 @@ quoted verbatim from the code.
 | account-service | `POST /uaa/users` (Feign, `name = "auth-service"`) | `account-service/src/main/java/com/piggymetrics/account/client/AuthServiceClient.java:9-14` | `client_credentials`, scope `server`, injected by `OAuth2FeignRequestInterceptor` (`account-service/.../config/ResourceServerConfig.java:39-42`) |
 | account-service | `PUT /statistics/{accountName}` (Feign, `name = "statistics-service"`, `fallback = StatisticsServiceClientFallback.class`) | `account-service/src/main/java/com/piggymetrics/account/client/StatisticsServiceClient.java:10-16` | same; `feign.hystrix.enabled: true` is set for this module (`shared/account-service.yml:24-26`) |
 | notification-service | `GET /accounts/{accountName}` (Feign, `name = "account-service"`) | `notification-service/src/main/java/com/piggymetrics/notification/client/AccountServiceClient.java:9-14` | same pattern (`notification-service/.../config/ResourceServerConfig.java:20-28`) |
-| statistics-service | `GET /latest?base=USD` against `${rates.url}` (Feign, `name = "rates-client"`, `fallback = ExchangeRatesClientFallback.class`) | `statistics-service/src/main/java/com/piggymetrics/statistics/client/ExchangeRatesClient.java:10-14` | none (external API / local stub). **`feign.hystrix.enabled` is never set for this module** (absent from `shared/statistics-service.yml` and `shared/statistics-service-local.yml`), and the module declares `spring-cloud-netflix-hystrix-stream` but not `spring-cloud-starter-netflix-hystrix` (`statistics-service/pom.xml:53-63`), so the declared fallback is inert: `/hystrix.stream` returned 404 on every T1 port and no Hystrix stream exists — see runtime item 1 |
+| statistics-service | `GET /latest?base=USD` against `${rates.url}` (Feign, `name = "rates-client"`, `fallback = ExchangeRatesClientFallback.class`) | `statistics-service/src/main/java/com/piggymetrics/statistics/client/ExchangeRatesClient.java:10-14` | none (external API / local stub). **`feign.hystrix.enabled` is never set for this module** (absent from `shared/statistics-service.yml` and `shared/statistics-service-local.yml`), and the module declares `spring-cloud-netflix-hystrix-stream` but not `spring-cloud-starter-netflix-hystrix` (`statistics-service/pom.xml:53-63`), so the declared fallback is inert: `/hystrix.stream` returned 404 on every T1 port and no Hystrix stream exists — see §3; the remaining open question is item 1 |
 
 The `/hystrix.stream` result above was observed on the T1 tier, 2026-09-08,
 commit `d91f384`; T2/T3 were not covered.
@@ -125,7 +128,7 @@ The one credential pair that is **not** externalised is the SMTP login in
 | Hystrix dashboard `/hystrix` (`monitoring`, host `:9000`) | monitoring | `@EnableHystrixDashboard` (`monitoring/src/main/java/com/piggymetrics/monitoring/MonitoringApplication.java:7-9`) | **unauthenticated** (`monitoring/pom.xml:19-30`) |
 | Turbine stream `/turbine.stream` (`turbine-stream-service`, host `:8989`) | turbine | `@EnableTurbineStream` (`turbine-stream-service/src/main/java/com/piggymetrics/turbine/TurbineStreamServiceApplication.java:8-10`) | **unauthenticated** (`turbine-stream-service/pom.xml:20-38`) |
 | RabbitMQ management UI (host `:15672`) | rabbitmq | `docker-compose.yml:3-11` | broker defaults; not configured in this repo |
-| `spring-boot-starter-actuator` on `account-service`, `statistics-service`, `notification-service` | those modules | declared (`account-service/pom.xml:53`, `statistics-service/pom.xml:53`, `notification-service/pom.xml:53`) but **no `management.endpoints.web.exposure.include` anywhere in the repository** (verified by searching all YAML), so Spring Boot 2.0's default web exposure (`health`, `info`) is what should apply; `/actuator/health` returned **404 on 5000, 6000, 7000 and 8000** in T1, so the declared actuator starter exposes nothing reachable there | these modules are resource servers whose default rule is "authenticated" |
+| `spring-boot-starter-actuator` on `account-service`, `statistics-service`, `notification-service` | those modules | declared (`account-service/pom.xml:53`, `statistics-service/pom.xml:53`, `notification-service/pom.xml:53`) but **no `management.endpoints.web.exposure.include` anywhere in the repository** (verified by searching all YAML), although Spring Boot 2.0's default web exposure would ordinarily be (`health`, `info`); `/actuator/health` returned **404 on 5000, 6000, 7000 and 8000** in T1, so the declared actuator starter exposes nothing reachable there | these modules are resource servers whose default rule is "authenticated" |
 | Hystrix metrics stream on `account/statistics/notification-service` | those modules | `spring-cloud-netflix-hystrix-stream` is on the classpath (e.g. `account-service/pom.xml:65`), which publishes metrics over **RabbitMQ**, not over an HTTP `/hystrix.stream` endpoint; `/hystrix.stream` returned **404 on 4000, 5000, 6000, 7000 and 8000** in T1, confirming there is no HTTP Hystrix stream at all | n/a — no broker exists in T1 or T2 |
 
 `gateway` and `registry` declare no actuator starter
@@ -267,8 +270,8 @@ servers consume it through `CustomUserInfoTokenServices`, which reads the
 `user_name`/principal key out of the returned map (e.g.
 `account-service/src/main/java/com/piggymetrics/account/service/security/CustomUserInfoTokenServices.java`).
 The concrete JSON shape is version-dependent on `spring-security-oauth2` and is
-therefore a migration risk in its own right; its exact fields are a runtime
-item.
+therefore a migration risk in its own right; its exact fields remain unchecked
+and are listed as open item 2.
 
 ### 4.6 Request bodies that are not response types
 

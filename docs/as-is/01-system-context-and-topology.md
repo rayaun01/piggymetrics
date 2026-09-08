@@ -1,9 +1,13 @@
 # As-is: system context and topology
 
 Reverse-engineered from the branch `devin/1788845133-stage-0-demo-harness`.
-Every claim below is traceable to a file in this repository; the citation is
-given inline as `path:line`. Nothing here was confirmed against a running
-instance — see [Open items for runtime verification](#open-items-for-runtime-verification).
+Every claim is derived from a file in this repository and cited inline as
+`path:line`, **except** the runtime observations in
+[§6](#6-runtime-observations-t1-tier-observed-2026-09-08-commit-d91f384), which
+were observed on a running T1 stack on 2026-09-08 at commit `d91f384` and are
+attributed as observations rather than code citations. T2 and T3 were never
+observed; what remains unchecked is listed in
+[Open items for runtime verification](#open-items-for-runtime-verification).
 
 Scope: the nine Maven modules of the Java stack. The three .NET Core 2.1
 services (`fraud-detection-service`, `compliance-service`,
