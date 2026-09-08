@@ -9,13 +9,18 @@ T0 is the smallest repeatable check. It runs the default seven-module core
 reactor:
 
 ```bash
-JAVA_HOME=/home/ubuntu/.local/jdks/jdk8u504-b01 \
-PATH="$JAVA_HOME/bin:$PATH" \
-mvn -s /home/ubuntu/repos/piggymetrics-baseline/settings-mirror.xml -fae test
+JAVA_HOME=/usr/lib/jvm/temurin-8-jdk-amd64 mvn -B -fae test
 ```
 
-The repository enforces JDK 8. GitHub-hosted CI can use Maven Central directly;
-the mirror above is for this environment's HTTP 429 limitation.
+The repository enforces JDK 8 through maven-enforcer, so the build fails fast on
+any other JDK rather than producing Java 8-incompatible bytecode.
+
+GitHub-hosted CI reaches Maven Central directly. Networks that cannot (Maven
+Central rate-limits some environments with HTTP 429, and corporate networks
+often block it outright) need a `central` mirror in `~/.m2/settings.xml`; the
+repository's environment blueprint writes one, and every Maven command below
+picks it up automatically. Nothing in the build depends on a mirror being
+present.
 
 ## T1: capped bare JVMs
 
@@ -70,13 +75,16 @@ The matching `mongo` shell must be at `/path/to/mongodb/bin/mongo`.
 T2 is the low-footprint container tier. It contains one MongoDB, seven Java
 services, and one rates stub:
 
-1. Build the Java artifacts with JDK 8 and the environment's Maven mirror:
+1. Build the Java artifacts with JDK 8:
 
    ```bash
-   export JAVA_HOME=/usr/lib/jvm/temurin-8-jdk-amd64
-   export PATH="$JAVA_HOME/bin:$PATH"
-   mvn -s /home/ubuntu/repos/piggymetrics-baseline/settings-mirror.xml -B -fae package
+   JAVA_HOME=/usr/lib/jvm/temurin-8-jdk-amd64 mvn -B package
    ```
+
+   The Dockerfiles `ADD target/*.jar`, so this step is mandatory on a fresh
+   clone: `target/` is not tracked, and the image build fails without it. Note
+   `package` here without `-fae` — a module skipped by fail-at-end produces no
+   jar and the failure resurfaces later as a confusing Docker build error.
 
 2. Validate and start the core Compose tier:
 
@@ -95,12 +103,10 @@ The services receive `MONGO_HOST=mongodb`, `AUTH_HOST=auth-service`,
 T3 preserves the repository's original Java Compose tier, without the
 out-of-scope .NET services:
 
-1. Build the full Java reactor with JDK 8 and the environment's Maven mirror:
+1. Build the full Java reactor with JDK 8:
 
    ```bash
-   export JAVA_HOME=/usr/lib/jvm/temurin-8-jdk-amd64
-   export PATH="$JAVA_HOME/bin:$PATH"
-   mvn -s /home/ubuntu/repos/piggymetrics-baseline/settings-mirror.xml -B -fae -Pfull package
+   JAVA_HOME=/usr/lib/jvm/temurin-8-jdk-amd64 mvn -B -Pfull package
    ```
 
 2. Build and start the full Compose tier:
