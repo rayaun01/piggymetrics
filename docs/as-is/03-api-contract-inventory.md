@@ -59,7 +59,10 @@ quoted verbatim from the code.
 | account-service | `POST /uaa/users` (Feign, `name = "auth-service"`) | `account-service/src/main/java/com/piggymetrics/account/client/AuthServiceClient.java:9-14` | `client_credentials`, scope `server`, injected by `OAuth2FeignRequestInterceptor` (`account-service/.../config/ResourceServerConfig.java:39-42`) |
 | account-service | `PUT /statistics/{accountName}` (Feign, `name = "statistics-service"`, `fallback = StatisticsServiceClientFallback.class`) | `account-service/src/main/java/com/piggymetrics/account/client/StatisticsServiceClient.java:10-16` | same; `feign.hystrix.enabled: true` is set for this module (`shared/account-service.yml:24-26`) |
 | notification-service | `GET /accounts/{accountName}` (Feign, `name = "account-service"`) | `notification-service/src/main/java/com/piggymetrics/notification/client/AccountServiceClient.java:9-14` | same pattern (`notification-service/.../config/ResourceServerConfig.java:20-28`) |
-| statistics-service | `GET /latest?base=USD` against `${rates.url}` (Feign, `name = "rates-client"`, `fallback = ExchangeRatesClientFallback.class`) | `statistics-service/src/main/java/com/piggymetrics/statistics/client/ExchangeRatesClient.java:10-14` | none (external API / local stub). **`feign.hystrix.enabled` is never set for this module** (absent from `shared/statistics-service.yml` and `shared/statistics-service-local.yml`), and the module declares `spring-cloud-netflix-hystrix-stream` but not `spring-cloud-starter-netflix-hystrix` (`statistics-service/pom.xml:53-63`), so the declared fallback is very likely inert — see runtime item 4 |
+| statistics-service | `GET /latest?base=USD` against `${rates.url}` (Feign, `name = "rates-client"`, `fallback = ExchangeRatesClientFallback.class`) | `statistics-service/src/main/java/com/piggymetrics/statistics/client/ExchangeRatesClient.java:10-14` | none (external API / local stub). **`feign.hystrix.enabled` is never set for this module** (absent from `shared/statistics-service.yml` and `shared/statistics-service-local.yml`), and the module declares `spring-cloud-netflix-hystrix-stream` but not `spring-cloud-starter-netflix-hystrix` (`statistics-service/pom.xml:53-63`), so the declared fallback is inert: `/hystrix.stream` returned 404 on every T1 port and no Hystrix stream exists — see runtime item 1 |
+
+The `/hystrix.stream` result above was observed on the T1 tier, 2026-09-08,
+commit `d91f384`; T2/T3 were not covered.
 
 ## 2. OAuth2 token endpoints, clients and grants
 
@@ -116,20 +119,25 @@ The one credential pair that is **not** externalised is the SMTP login in
 
 | Endpoint | Where | Exposure claim | Authentication |
 | --- | --- | --- | --- |
-| `/actuator/**` on `config` (`:8888`) | config server | explicitly permitted (`config/src/main/java/com/piggymetrics/config/SecurityConfig.java:14-22`); `config/Dockerfile:7` health-checks `/actuator/health` | **unauthenticated** — everything else on 8888 requires HTTP Basic |
+| `/actuator/**` on `config` (`:8888`) | config server | explicitly permitted (`config/src/main/java/com/piggymetrics/config/SecurityConfig.java:14-22`); `config/Dockerfile:7` health-checks `/actuator/health`; observed **200** for `/actuator/health` in T1 | **unauthenticated** — `GET /health` returned **401** in T1; everything else on 8888 requires HTTP Basic |
 | `/<application>/<profile>` on `config` (`:8888`) | config server | e.g. `/account-service/local`, polled by `scripts/demo/start-local.sh:80-84` | HTTP Basic `user` / `<redacted, see .env>` |
-| Eureka dashboard `/` and REST `/eureka/apps/**` (`:8761`) | registry | published to the host in T3 (`docker-compose.yml:31-32`) and T2 (`docker-compose.core.yml:41-42`); queried without credentials by `scripts/demo/start-local.sh:90-97` | **unauthenticated** — `registry/pom.xml:19-31` declares no security starter |
+| Eureka dashboard `/` and REST `/eureka/apps/**` (`:8761`) | registry | published to the host in T3 (`docker-compose.yml:31-32`) and T2 (`docker-compose.core.yml:41-42`); queried without credentials by `scripts/demo/start-local.sh:90-97`; observed **200 unauthenticated** for `/` in T1 | **unauthenticated** — `registry/pom.xml:19-31` declares no security starter |
 | Hystrix dashboard `/hystrix` (`monitoring`, host `:9000`) | monitoring | `@EnableHystrixDashboard` (`monitoring/src/main/java/com/piggymetrics/monitoring/MonitoringApplication.java:7-9`) | **unauthenticated** (`monitoring/pom.xml:19-30`) |
 | Turbine stream `/turbine.stream` (`turbine-stream-service`, host `:8989`) | turbine | `@EnableTurbineStream` (`turbine-stream-service/src/main/java/com/piggymetrics/turbine/TurbineStreamServiceApplication.java:8-10`) | **unauthenticated** (`turbine-stream-service/pom.xml:20-38`) |
 | RabbitMQ management UI (host `:15672`) | rabbitmq | `docker-compose.yml:3-11` | broker defaults; not configured in this repo |
-| `spring-boot-starter-actuator` on `account-service`, `statistics-service`, `notification-service` | those modules | declared (`account-service/pom.xml:53`, `statistics-service/pom.xml:53`, `notification-service/pom.xml:53`) but **no `management.endpoints.web.exposure.include` anywhere in the repository** (verified by searching all YAML), so Spring Boot 2.0's default web exposure (`health`, `info`) is what should apply | these modules are resource servers whose default rule is "authenticated"; whether the actuator paths sit inside or outside that filter chain is unverified — runtime item 2 |
-| Hystrix metrics stream on `account/statistics/notification-service` | those modules | `spring-cloud-netflix-hystrix-stream` is on the classpath (e.g. `account-service/pom.xml:65`), which publishes metrics over **RabbitMQ**, not over an HTTP `/hystrix.stream` endpoint | n/a — no broker exists in T1 or T2 |
+| `spring-boot-starter-actuator` on `account-service`, `statistics-service`, `notification-service` | those modules | declared (`account-service/pom.xml:53`, `statistics-service/pom.xml:53`, `notification-service/pom.xml:53`) but **no `management.endpoints.web.exposure.include` anywhere in the repository** (verified by searching all YAML), so Spring Boot 2.0's default web exposure (`health`, `info`) is what should apply; `/actuator/health` returned **404 on 5000, 6000, 7000 and 8000** in T1, so the declared actuator starter exposes nothing reachable there | these modules are resource servers whose default rule is "authenticated" |
+| Hystrix metrics stream on `account/statistics/notification-service` | those modules | `spring-cloud-netflix-hystrix-stream` is on the classpath (e.g. `account-service/pom.xml:65`), which publishes metrics over **RabbitMQ**, not over an HTTP `/hystrix.stream` endpoint; `/hystrix.stream` returned **404 on 4000, 5000, 6000, 7000 and 8000** in T1, confirming there is no HTTP Hystrix stream at all | n/a — no broker exists in T1 or T2 |
 
 `gateway` and `registry` declare no actuator starter
-(`gateway/pom.xml:19-43`, `registry/pom.xml:19-31`), so no `/actuator/health`
-should exist on `:4000`; `scripts/demo/start-local.sh:110-118` accordingly uses
+(`gateway/pom.xml:19-43`, `registry/pom.xml:19-31`), but `/actuator/health`
+returned **200 unauthenticated** on both 4000 and 8761 in T1. Actuator therefore
+reaches both services transitively and is additional unauthenticated surface on
+two published ports; `scripts/demo/start-local.sh:110-118` still uses
 `GET /accounts/demo` plus Eureka status as its readiness probe rather than an
 actuator endpoint.
+
+The endpoint observations in this table and paragraph were observed on the T1
+tier, 2026-09-08, commit `d91f384`; T2/T3 were not covered.
 
 ## 4. Response payload types
 
@@ -137,12 +145,15 @@ All money amounts are `java.math.BigDecimal`. Jackson serialises `BigDecimal`
 as an unquoted JSON number preserving the value's scale, so scale drift on
 migration is directly wire-visible.
 
+The runtime payload observations in §4.1–§4.3 were observed on the T1 tier,
+2026-09-08, commit `d91f384`; T2/T3 were not covered.
+
 ### 4.1 `Account` (account-service) — `account-service/src/main/java/com/piggymetrics/account/domain/Account.java:15-33`
 
 | Field | Java type | Notes |
 | --- | --- | --- |
 | `name` | `String` | `@Id`, the account/username |
-| `lastSeen` | `java.util.Date` | serialised as epoch millis by default |
+| `lastSeen` | `java.util.Date` | observed as `"2026-09-08T17:49:44.928+0000"` in T1, not epoch millis |
 | `incomes` | `List<Item>` | |
 | `expenses` | `List<Item>` | |
 | `saving` | `Saving` | `@NotNull` |
@@ -165,7 +176,7 @@ migration is directly wire-visible.
 
 | Field | Java type | Notes |
 | --- | --- | --- |
-| `id` | `DataPointId` | `{ account: String, date: java.util.Date }` (`.../timeseries/DataPointId.java:6-25`) |
+| `id` | `DataPointId` | `{ account: String, date: java.util.Date }` (`.../timeseries/DataPointId.java:6-25`); observed serialising as a nested JSON object, with `date` as `"2026-09-08T00:00:00.000+0000"` |
 | `incomes` | `Set<ItemMetric>` | |
 | `expenses` | `Set<ItemMetric>` | |
 | `statistics` | `Map<StatisticMetric, BigDecimal>` | keys `INCOMES_AMOUNT`, `EXPENSES_AMOUNT`, `SAVING_AMOUNT` (`.../timeseries/StatisticMetric.java:3-6`) |
@@ -175,7 +186,7 @@ migration is directly wire-visible.
 **`amount` `BigDecimal`** (getter-only, so serialised but not deserialised via
 setters).
 
-### 4.3 Observed scale of the `BigDecimal` values (from the arithmetic, not from a live response)
+### 4.3 BigDecimal scale: arithmetic derivation and observed wire format
 
 * `ItemMetric.amount` = `convert(...) / period.baseRatio` with
   `divide(..., 4, RoundingMode.HALF_UP)`
@@ -199,8 +210,38 @@ setters).
   version or of this constructor changes the divisor and therefore the last
   digits of every metric.
 
-These are the *derived* scales. What actually reaches the wire (and whether
-Jackson emits `1` or `1.0000`) is a runtime item.
+These are the *derived* scales. The following is one observed T1 sample, not an
+exhaustive contract; it is the baseline any Boot 3 / Jackson upgrade must be
+diffed against.
+
+#### Actual wire text
+
+`GET /statistics/current` (T1):
+
+```json
+[{"id":{"account":"wire1788889784","date":"2026-09-08T00:00:00.000+0000"},"incomes":[{"title":"Salary","amount":2.2341}],"expenses":[{"title":"Tokyo","amount":0.0330}],"statistics":{"EXPENSES_AMOUNT":0.0330,"INCOMES_AMOUNT":2.2341,"SAVING_AMOUNT":0.6800},"rates":{"EUR":0.92,"JPY":147.85,"RUB":92.5,"USD":1}}]
+```
+
+`GET /accounts/current` (T1):
+
+```json
+{"name":"wire1788889784","lastSeen":"2026-09-08T17:49:44.928+0000","incomes":[{"title":"Salary","amount":10000,"currency":"JPY","period":"MONTH","icon":"wallet"}],"expenses":[{"title":"Tokyo","amount":147.85,"currency":"JPY","period":"MONTH","icon":"travel"}],"saving":{"amount":100,"currency":"JPY","interest":3.32,"deposit":true,"capitalization":false},"note":"wire"}
+```
+
+These samples confirm four wire-format facts:
+
+1. `BigDecimal` scale is preserved literally including trailing zeros —
+   `0.0330` and `0.6800` are emitted with scale 4, matching the derived scale
+   above, and `SAVING_AMOUNT` came back as `0.6800` (scale 4) for this input.
+2. A single `rates` map mixes scales: `"USD":1` (scale 0, from
+   `BigDecimal.ONE`) alongside `"JPY":147.85` — so any consumer doing exact
+   string or scale comparison sees heterogeneous output within one object.
+3. Amounts are unquoted JSON numbers, so a client parsing into a binary float
+   loses the exact decimal (`147.85`, `2.2341`).
+4. `Date` uses the `+0000` offset form; the composite `id` is a nested object.
+
+This is one observed sample on T1, covering only these two endpoints and this
+one input, not an exhaustive contract.
 
 ### 4.4 `Recipient` (notification-service) — `notification-service/src/main/java/com/piggymetrics/notification/domain/Recipient.java:12-22`
 
@@ -251,51 +292,38 @@ item.
 
 ## Open items for runtime verification
 
-This VM has no JDK 8 and no running stack; the reactor was deliberately not
-built. Each item below is a concrete check.
+The T1 observations in §1.1, §3, and §4.3 now cover actuator reachability, the
+Hystrix stream, the Eureka dashboard, the observed wire formats, and the
+fallback wiring. The remainder is still open; T2/T3 were not covered. Each
+item below is a concrete check.
 
-1. **Actual serialization scale of every `BigDecimal`.** Bring up T1
-   (`scripts/demo/start-local.sh`), run `scripts/demo/smoke.sh`, then
-   `curl -s -H "Authorization: Bearer $TOKEN" http://localhost:4000/statistics/current | jq .`
-   and record the literal text of `statistics.*`, `rates.*` and
-   `incomes[].amount` (e.g. is USD emitted as `1` or `1.0000`?). Capture the
-   same for `GET /accounts/current` before and after the migration and diff the
-   raw bytes, not the parsed numbers.
-2. **Whether actuator endpoints are reachable and on which paths.** With T2 up,
-   `curl -i http://localhost:6000/accounts/actuator/health`,
-   `.../actuator/info`, and the same on 7000/8000 — with and without a bearer
-   token — to establish both the path (context path included or not) and
-   whether they are anonymous.
-3. **Whether any `/hystrix.stream` HTTP endpoint exists.** `curl -i http://localhost:6000/accounts/hystrix.stream`
-   and `.../actuator/hystrix.stream` in T2; the classpath suggests the AMQP
-   stream binder only.
-4. **Whether `ExchangeRatesClientFallback` ever fires.** Start T1, stop the
+1. **Statistics behavior when the rates stub is unreachable.** The T1
+   observation in §1.1 confirms that `ExchangeRatesClientFallback` is inert.
+   Stop the
    rates stub (`kill` the PID in `.demo-runtime/pids/rates-stub.pid`), then
-   `PUT /accounts/current` and observe whether `statistics-service` returns a
-   response built from the empty-rates fallback or throws (a `NullPointerException`
-   from `container.getRates().get("EUR")` in `ExchangeRatesServiceImpl.java:39-44`
-   would indicate the fallback fired but is itself broken, and a Feign
-   connection exception would indicate `feign.hystrix.enabled` is off for this
-   module).
-5. **Exact JSON of `GET /uaa/users/current`.** `curl -s -H "Authorization: Bearer $TOKEN" http://localhost:4000/uaa/users/current | jq .`
+   `PUT /accounts/current` and determine whether `statistics-service` returns
+   HTTP 500 or throws a `NullPointerException` from
+   `container.getRates().get("EUR")` in `ExchangeRatesServiceImpl.java:39-44`,
+   given that no circuit breaker is enabled for this module.
+2. **Exact JSON of `GET /uaa/users/current`.** `curl -s -H "Authorization: Bearer $TOKEN" http://localhost:4000/uaa/users/current | jq .`
    and record the field names; this payload is the contract every resource
    server depends on and it is produced by library code, not by this repo.
-6. **`/statistics/demo` reachability.** `scripts/demo/smoke.sh:63` calls it
+3. **`/statistics/demo` reachability.** `scripts/demo/smoke.sh:63` calls it
    *with* a bearer token; confirm that an anonymous
    `curl -i http://localhost:4000/statistics/demo` is rejected (401), which
    would confirm the asymmetry with `/accounts/demo` described in §1.
-7. **`POST /accounts/` duplicate-name behaviour.** `AccountServiceImpl.create`
+4. **`POST /accounts/` duplicate-name behaviour.** `AccountServiceImpl.create`
    raises `IllegalArgumentException` via `Assert.isNull`
    (`account-service/.../service/AccountServiceImpl.java:46-51`) and
    `ErrorHandler` maps that to HTTP 400
    (`account-service/.../controller/ErrorHandler.java:17-21`); the UI relies on
    the 400 (`gateway/src/main/resources/static/js/login.js`). Verify the status
    code is still 400 and not 500 after the migration.
-8. **Whether `/uaa/oauth/authorize`, `/oauth/error`, `/oauth/confirm_access`
+5. **Whether `/uaa/oauth/authorize`, `/oauth/error`, `/oauth/confirm_access`
    are actually registered.** `curl -i http://localhost:4000/uaa/oauth/authorize`
    in T1 and record the status; §2 infers their existence from
    `@EnableAuthorizationServer` defaults, not from observation.
-9. **Refresh-token grant.** Every service client declares `refresh_token`
+6. **Refresh-token grant.** Every service client declares `refresh_token`
    alongside `client_credentials`, which the spec does not allow to issue
    refresh tokens. Verify with
    `curl -u account-service:<redacted, see .env> -d grant_type=client_credentials http://localhost:4000/uaa/oauth/token`

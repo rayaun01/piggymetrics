@@ -244,7 +244,10 @@ the same thing:
 6. **Auth-service routing.** The gateway routes `/uaa/**` to a fixed URL rather
    than to the Eureka `serviceId` used for every other service
    (`shared/gateway.yml:20-24` vs `:26-42`), so `auth-service` registers with
-   Eureka but is never resolved through it.
+   Eureka but is never resolved through it. This is confirmed by the T1
+   observation in §6: `auth-service` was registered in Eureka as
+   `AUTH-SERVICE`, while `/uaa/**` continued to use the static URL, so that
+   registration was genuinely unused.
 7. **Rates source.** `https://api.exchangeratesapi.io`
    (`shared/statistics-service.yml:24-25`) vs the local stub
    (`shared/statistics-service-local.yml:12-13`) vs `http://localhost:1` in
@@ -263,42 +266,68 @@ the same thing:
     and the Compose mappings (`monitoring/Dockerfile:7`,
     `turbine-stream-service/Dockerfile:7`, `docker-compose.yml:164-165,179-180`).
 
+## 6. Runtime observations (T1 tier, observed 2026-09-08, commit `d91f384`)
+
+The following were observed on a running T1 stack (bare JVMs,
+`scripts/demo/start-local.sh`). They are observations, not code citations, and
+they say nothing about T2 or T3.
+
+* `config` `GET http://localhost:8888/actuator/health` → **200**, so the T3
+  `condition: service_healthy` gate does open. Note the fragility: `config/pom.xml`
+  declares no `spring-boot-starter-actuator`, so actuator arrives transitively
+  through `spring-cloud-config-server` (`config/pom.xml:19-28`). The healthcheck
+  in `config/Dockerfile:7` therefore depends on an undeclared transitive
+  dependency — precisely the kind of thing a dependency or Boot upgrade removes
+  silently, with the failure surfacing as "no service ever becomes healthy in T3"
+  rather than as a build error.
+* `config` `GET /health` → **401**, confirming the Spring Boot 1.x actuator path
+  is gone and only the `/actuator/**` prefix (permitted anonymously by
+  `config/src/main/java/com/piggymetrics/config/SecurityConfig.java:14-22`) is live.
+* Eureka registrations in T1: `GATEWAY`, `AUTH-SERVICE`, `ACCOUNT-SERVICE`,
+  `STATISTICS-SERVICE`, `NOTIFICATION-SERVICE`. `monitoring` and
+  `turbine-stream-service` are not part of T1, so their registration behaviour
+  remains unobserved.
+* The Eureka dashboard `GET http://localhost:8761/` → **200 unauthenticated**,
+  confirming the trust-boundary claim in §4.1 by observation and not only by the
+  absence of a security starter.
+* `/hystrix.stream` → **404 on every one of 4000, 5000, 6000, 7000 and 8000**. No
+  Hystrix stream endpoint exists anywhere in T1 (see §3 in the API contract
+  inventory: Turbine has nothing to aggregate).
+* `/actuator/health` → **404 on 5000, 6000, 7000 and 8000**; **200,
+  unauthenticated, on 4000 (`gateway`) and 8761 (`registry`)**. Actuator is
+  exposed on exactly the two infrastructure services and on none of the resource
+  servers — the opposite of what the declared dependencies suggest, since the
+  three resource servers declare `spring-boot-starter-actuator` while `gateway`
+  and `registry` do not. Both live endpoints are additional unauthenticated
+  surface on already-published ports (host `:80`→4000 and `:8761` in T3).
+
 ## Open items for runtime verification
 
-Nothing below could be checked here: this VM has no JDK 8, no running stack,
-and the reactor was deliberately not built.
+These are the items still open after the T1 observations in §6. Those
+observations cover T1 only and say nothing about T2 or T3.
 
-1. **Actuator on `config`.** `config/pom.xml` declares no
-   `spring-boot-starter-actuator`, yet `config/Dockerfile:7` health-checks
-   `http://localhost:8888/actuator/health` and `docker-compose.yml` gates every
-   other service on `condition: service_healthy`. Check:
-   `docker compose -f docker-compose.yml up -d config` then
-   `docker inspect --format '{{json .State.Health}}' <config container>` and
-   `curl -i http://localhost:8888/actuator/health` (T2, where 8888 is
-   published). If the endpoint 404s, the T3 dependency gate never opens.
-2. **Effective port of `monitoring`.** Run `-Pfull` T3 and
+1. **Effective port of `monitoring`.** Run `-Pfull` T3 and
    `curl -i http://localhost:9000/hystrix`; confirm the container really
    listens on 8080.
-3. **Effective port of `turbine-stream-service`.** `curl -i http://localhost:8989/turbine.stream`
+2. **Effective port of `turbine-stream-service`.** `curl -i http://localhost:8989/turbine.stream`
    in T3 and confirm the process bound 8989 rather than the Boot default 8080.
-4. **Actual Eureka registrations per tier.** In T1/T2 run
+3. **Actual Eureka registrations per tier.** T1 is now observed in §6. The
+   remaining open part is T2 and T3 only: run
    `curl -s -H 'Accept: application/json' http://localhost:8761/eureka/apps | jq '.applications.application[].name'`
-   and compare against the "Registers with Eureka" column; in particular
-   confirm `gateway`, `auth-service` and `turbine-stream-service` appear and
-   `monitoring` does not.
-5. **Whether the Hystrix/Turbine path functions at all without RabbitMQ.**
-   Start T2 and check `docker compose -f docker-compose.core.yml logs account-service`
-   for AMQP connection-refused loops caused by `spring-cloud-netflix-hystrix-stream`
-   (`account-service/pom.xml:61-68`).
-6. **Anonymous reachability of the Eureka dashboard.** `curl -i http://localhost:8761/`
-   in T3 and confirm HTTP 200 without credentials (the trust-boundary claim in
-   §4.1 is derived from the absence of a security starter, not observed).
-7. **MongoDB credentials under the `local` profile.** Confirm that the
+   and compare against the "Registers with Eureka" column, in particular
+   whether `turbine-stream-service` appears and `monitoring` does not in a
+   `-Pfull` T3 run.
+4. **Whether the Hystrix/Turbine AMQP path produces connection errors.** T1
+   shows no `/hystrix.stream` endpoint anywhere. The remaining question is
+   whether the AMQP stream binder produces connection-refused log loops in T2:
+   check `docker compose -f docker-compose.core.yml logs account-service` for
+   `spring-cloud-netflix-hystrix-stream` (`account-service/pom.xml:61-68`).
+5. **MongoDB credentials under the `local` profile.** Confirm that the
    `*-local.yml` overlays inherit `username: user` / `${MONGODB_PASSWORD}` from
    the non-local files by checking `curl -u user:$CONFIG_SERVICE_PASSWORD http://localhost:8888/account-service/local`
    and looking for `spring.data.mongodb.username` in the merged property
    sources.
-8. **T3 without `monitoring`/`turbine` images built.** `docker-compose.yml`
+6. **T3 without `monitoring`/`turbine` images built.** `docker-compose.yml`
    references `sqshq/piggymetrics-*` images from Docker Hub; verify whether
    those still exist and are Java 8 images, or whether T3 requires
    `docker-compose.dev.yml` builds in practice.
