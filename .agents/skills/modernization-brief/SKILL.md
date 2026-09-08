@@ -61,6 +61,12 @@ Every stage has a branch, an immutable tag, and a reviewable PR. Do not
 combine stages because a different order feels cleaner; cite the register
 fact that forces any proposed change.
 
+The register uses its own stage labels for the same path: stages 1 and 2 here
+are its `S1`, stage 3 is `S2`, stage 4 is `S3`, and stage 5 is `S4`. Test
+infrastructure is split out of `S1` into its own stage because JaCoCo and
+flapdoodle block the build before any test runs, which makes them a
+prerequisite rather than work that rides along.
+
 ## Required pilot
 
 The pilot is `account-service`: it is representative rather than easiest,

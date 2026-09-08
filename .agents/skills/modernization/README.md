@@ -129,5 +129,4 @@ not a kit assumption:
 ## 12. License pointer
 
 Adapted from an Apache-2.0 licensed code-modernization plugin. See
-`.agents/NOTICE`, `.agents/LICENSE-APACHE-2.0`, and
-`skills/modernization/PROVENANCE.md`.
+`.agents/NOTICE`, `.agents/LICENSE-APACHE-2.0`, and `PROVENANCE.md`.
