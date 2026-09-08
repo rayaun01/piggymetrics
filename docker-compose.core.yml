@@ -26,6 +26,7 @@ services:
     environment:
       CONFIG_SERVICE_PASSWORD: ${CONFIG_SERVICE_PASSWORD:-password}
       SPRING_PROFILES_ACTIVE: local,native
+    restart: on-failure
     ports:
       - "8888:8888"
 
