@@ -2,11 +2,21 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-MONGO_BIN="${MONGO_BIN:-$ROOT_DIR/../piggymetrics-demo-harness/mongodb/bin/mongo}"
+MONGO_BIN="${MONGO_BIN:-mongo}"
 MONGODB_PASSWORD="${MONGODB_PASSWORD:-password}"
 MONGO_AUTH="${MONGO_AUTH:-1}"
 SEED_FILE="$(mktemp)"
 trap 'rm -f "$SEED_FILE"' EXIT
+
+if [[ "$MONGO_BIN" == */* ]]; then
+  if [[ ! -x "$MONGO_BIN" ]]; then
+    echo "MONGO_BIN '$MONGO_BIN' was not found or is not executable; set MONGO_BIN to the Mongo shell binary." >&2
+    exit 1
+  fi
+elif ! command -v "$MONGO_BIN" >/dev/null 2>&1; then
+  echo "MONGO_BIN '$MONGO_BIN' was not found on PATH; set MONGO_BIN to the Mongo shell binary." >&2
+  exit 1
+fi
 
 sed \
   -e "s#__MONGODB_PASSWORD__#${MONGODB_PASSWORD//\\/\\\\}#" \

@@ -4,8 +4,6 @@
 
 print('dump start');
 
-db = db.getSiblingDB('piggymetrics_accounts');
-
 db.accounts.replaceOne(
     { "_id": "demo" },
     {

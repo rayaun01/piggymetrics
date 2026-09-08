@@ -4,6 +4,7 @@ services:
     environment:
       MONGO_INITDB_ROOT_USERNAME: root
       MONGO_INITDB_ROOT_PASSWORD: ${MONGODB_PASSWORD:-password}
+      MONGO_INITDB_DATABASE: piggymetrics_accounts
       MONGODB_PASSWORD: ${MONGODB_PASSWORD:-password}
     ports:
       - "27017:27017"

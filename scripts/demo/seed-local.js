@@ -18,4 +18,5 @@ databases.forEach(function (databaseName) {
     }
 });
 
+db = db.getSiblingDB("piggymetrics_accounts");
 load("__ACCOUNT_DUMP__");

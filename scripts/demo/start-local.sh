@@ -5,10 +5,28 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 RUNTIME_DIR="${PIGGYMETRICS_RUNTIME_DIR:-$ROOT_DIR/.demo-runtime}"
 LOG_DIR="$RUNTIME_DIR/logs"
 PID_DIR="$RUNTIME_DIR/pids"
-MONGO_BIN="${MONGO_BIN:-$ROOT_DIR/../piggymetrics-demo-harness/mongodb/bin/mongod}"
+MONGO_BIN="${MONGO_BIN:-mongod}"
 MONGO_DATA_DIR="${MONGO_DATA_DIR:-$RUNTIME_DIR/mongodb-data}"
 MONGODB_PASSWORD="${MONGODB_PASSWORD:-password}"
 JAVA_BIN="${JAVA_BIN:-$HOME/.local/jdks/jdk8u504-b01/bin/java}"
+
+if [[ "$MONGO_BIN" == */* ]]; then
+  if [[ ! -x "$MONGO_BIN" ]]; then
+    echo "MONGO_BIN '$MONGO_BIN' was not found or is not executable; set MONGO_BIN to the mongod binary." >&2
+    exit 1
+  fi
+elif ! command -v "$MONGO_BIN" >/dev/null 2>&1; then
+  echo "MONGO_BIN '$MONGO_BIN' was not found on PATH; set MONGO_BIN to the mongod binary." >&2
+  exit 1
+fi
+
+if [[ "$MONGO_BIN" == */mongod ]]; then
+  MONGO_SHELL_BIN="${MONGO_BIN%/mongod}/mongo"
+elif [[ "$MONGO_BIN" == "mongod" ]]; then
+  MONGO_SHELL_BIN=mongo
+else
+  MONGO_SHELL_BIN="${MONGO_SHELL_BIN:-mongo}"
+fi
 
 if [[ -f "$ROOT_DIR/.env" ]]; then
   set -a
@@ -28,7 +46,7 @@ fi
 if ! pgrep -f "$MONGO_BIN.*$MONGO_DATA_DIR" >/dev/null; then
   "$MONGO_BIN" --dbpath "$MONGO_DATA_DIR" --bind_ip 127.0.0.1 \
     --port 27017 --logpath "$LOG_DIR/mongod.log" --fork
-  MONGO_AUTH=0 MONGO_BIN="${MONGO_BIN%/mongod}/mongo" \
+  MONGO_AUTH=0 MONGO_BIN="$MONGO_SHELL_BIN" \
     MONGODB_PASSWORD="$MONGODB_PASSWORD" \
     "$ROOT_DIR/scripts/demo/seed-local.sh"
   "$MONGO_BIN" --dbpath "$MONGO_DATA_DIR" --shutdown

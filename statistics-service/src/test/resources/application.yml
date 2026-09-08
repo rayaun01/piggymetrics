@@ -13,4 +13,4 @@ spring:
       port: 0
 
 rates:
-  url: ${RATES_URL:http://localhost:18080}
+  url: ${RATES_URL:http://localhost:1}

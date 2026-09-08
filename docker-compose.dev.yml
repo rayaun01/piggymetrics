@@ -54,3 +54,9 @@ services:
     build: mongodb
     ports:
       - 28000:27017
+
+  monitoring:
+    build: monitoring
+
+  turbine-stream-service:
+    build: turbine-stream-service

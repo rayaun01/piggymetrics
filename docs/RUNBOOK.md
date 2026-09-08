@@ -54,9 +54,16 @@ Stop T1 with:
 scripts/demo/stop-local.sh
 ```
 
-The harness defaults `MONGO_BIN` to
-`../piggymetrics-demo-harness/mongodb/bin/mongod`, relative to the repository
-root. Set `MONGO_BIN` to another `mongod` binary when needed.
+The harness defaults `MONGO_BIN` to `mongod` on `PATH`. Set `MONGO_BIN` to
+another `mongod` binary when needed. The seed script similarly defaults to
+`mongo` on `PATH` and accepts `MONGO_BIN` for an alternate Mongo shell.
+When MongoDB is not installed system-wide, a tarball fallback is:
+
+```bash
+export MONGO_BIN=/path/to/mongodb/bin/mongod
+```
+
+The matching `mongo` shell must be at `/path/to/mongodb/bin/mongo`.
 
 ## T2: standalone core Compose
 
