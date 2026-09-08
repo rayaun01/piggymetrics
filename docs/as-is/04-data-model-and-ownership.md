@@ -9,9 +9,21 @@ their own collections (`compliance_rules`, `audit_logs`, `compliance_reports`,
 `fraud-detection-service/Services/FraudDetectionServiceImpl.cs:27-28`) and are not
 covered further.
 
-Every claim below cites the file it was read from. Nothing here was confirmed
-against a running MongoDB; anything that needs a live instance is in
+**Provenance.** Every claim below is derived from source and cites the file it
+was read from as `path:line`, with one exception:
+[§6.1](#61-runtime-evidence-for-d-2-and-d-11-observed) is a runtime observation
+from the **T1 tier at commit `d91f384`, made 2026-09-08**, reported to the author
+rather than reproduced here, and is labelled as such at the point of use. No
+other section was confirmed against a running MongoDB, and the T2 and T3 tiers
+were not observed at all. Anything that still needs a live instance is in
 [Open items for runtime verification](#open-items-for-runtime-verification).
+
+Note what §6.1's evidence does and does not cover: it shows the JSON that the
+API emits, which settles how `BigDecimal` **scale** reaches the wire, but it does
+not disclose the **BSON type stored** underneath — a BSON `double` and a
+Spring-Data-written `BigDecimal` can serialise to the same JSON number. Only the
+query in [§6.2](#62-detecting-the-mixed-type-condition-yourself), run against the
+database, settles that.
 
 ## 0. Database naming: two coexisting schemes
 
@@ -501,15 +513,20 @@ turn up in a database that should not have them):
 
 ## Open items for runtime verification
 
-None of the following could be established from source alone. Each is a command
-to run against a seeded stack (T1 after `scripts/demo/start-local.sh` +
+None of the following is established by this document. §6.1's T1 observation
+resolves only what is noted inline below; everything else here is still open,
+and the T2/T3 tiers are unobserved throughout. Each item is a command to run
+against a seeded stack (T1 after `scripts/demo/start-local.sh` +
 `scripts/demo/seed-local.sh`, or T2 after `docker compose -f
 docker-compose.core.yml up`). Use the credentials in `.env`
 (`<redacted, see .env>`).
 
-1. **Actual BSON type of every monetary field** (risk D-2) — confirm whether the
-   Java writer stores `BigDecimal` as string, double or `Decimal128`, and whether
-   it differs from the seeded document:
+1. **Actual BSON type of every monetary field** (risk D-2) — **still open.**
+   §6.1 observed only the serialised API output, which cannot distinguish a
+   stored `double` from a stored `BigDecimal`; §6.2 is the collection-wide
+   version of this check. Confirm whether the Java writer stores `BigDecimal` as
+   string, double or `Decimal128`, and whether it differs from the seeded
+   document:
    ```js
    // after a PUT /accounts/current has written a Java-side document
    use piggymetrics_accounts
@@ -523,8 +540,10 @@ docker-compose.core.yml up`). Use the credentials in `.env`
    (risk D-5) — they are `@Component` `Converter` beans
    (`DataPointIdWriterConverter.java:9`) registered via a `CustomConversions`
    bean (`StatisticsApplication.java:32-40`,
-   `NotificationServiceApplication.java:30-38`); what they produce on disk still
-   needs confirming:
+   `NotificationServiceApplication.java:30-38`). The `DataPointId` half is
+   corroborated by §6.1, where `datapoints._id` was observed as a nested object
+   rather than a string — consistent with the writer converter being applied;
+   the stored field order and the `Frequency` → `int` half are still open:
    ```js
    use piggymetrics_notifications
    db.recipients.findOne({}, { "scheduledNotifications.REMIND.frequency": 1 })
@@ -552,7 +571,8 @@ docker-compose.core.yml up`). Use the credentials in `.env`
    db.getSiblingDB("piggymetrics_statistics").getCollectionNames()
    db.getSiblingDB("piggymetrics").getCollectionNames()
    ```
-5. **`_class` values actually stored** (risk D-6):
+5. **`_class` values actually stored** (risk D-6) — §6.2 gives the grouped
+   version, which also reports which documents carry no `_class`:
    ```js
    use piggymetrics_accounts
    db.accounts.distinct("_class")   // expect com.piggymetrics.account.domain.Account, and nothing else
@@ -564,8 +584,11 @@ docker-compose.core.yml up`). Use the credentials in `.env`
    db.accounts.countDocuments({})
    db.accounts.findOne({ _id: "demo" }).expenses.filter(e => e.currency === "JPY")
    ```
-7. **Scale of stored statistic amounts** (risk D-11) — after
-   `PUT /accounts/current` with the smoke payload (`scripts/demo/smoke.sh:44-48`):
+7. **Scale of stored statistic amounts** (risk D-11) — partially covered:
+   §6.1 observed the scale of these values as **serialised by the API**
+   (`0.0330`, `0.6800`, and `rates.USD` as `1`); their scale and BSON type **as
+   stored** are still open. After `PUT /accounts/current` with the smoke payload
+   (`scripts/demo/smoke.sh:44-48`):
    ```js
    use piggymetrics_statistics
    db.datapoints.findOne({ "_id.account": "demo" }, { statistics: 1, rates: 1 })
