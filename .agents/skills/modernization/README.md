@@ -112,7 +112,7 @@ associated skills fall back to sequential delegation.
 
 ## 11. Repo-state notes
 
-The kit's cited paths resolve on this branch. What remains is stated so nobody
+The kit's cited paths resolve on `master`. What remains is stated so nobody
 mistakes an intentional gap for an oversight:
 
 - The four `docs/as-is/` artifacts (`01`, `03`, `04`, `05`) are present, and
@@ -120,11 +120,14 @@ mistakes an intentional gap for an oversight:
   reserves `02` for the runtime call graph, which is not written yet: it can
   only be produced against a running stack, so the number is held rather than
   reused.
-- `stage-0-baseline` tags the frozen baseline. Every stage branches from that
-  tag and is diffed against it.
-- `master` is not a usable oracle: it predates the Stage 0 harness, its test
-  suite does not pass, its Mongo image cannot build, and its front end is
-  broken. This is why the baseline is the tag, not the default branch.
+- `stage-0-baseline` is the frozen baseline: an immutable tag, not a branch.
+  Every stage branches from that tag and is diffed against it. `master` moves,
+  so it is never the oracle even though it now carries the Stage 0 harness;
+  history before that harness cannot be one either, because there the test
+  suite fails, the Mongo image will not build, and the front end is broken.
+- The tag predates this kit and the corrections to it. That is deliberate: the
+  baseline freezes application behavior, and method tooling added afterwards
+  must not move the oracle.
 - `docs/modernization/` does not exist yet; the uplift artifacts are its
   outputs, created by the skills rather than checked in ahead of them.
 
