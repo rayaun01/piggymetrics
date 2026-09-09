@@ -13,4 +13,4 @@ spring:
       port: 0
 
 rates:
-  url: https://api.exchangeratesapi.io
+  url: ${RATES_URL:http://localhost:1}

@@ -3,11 +3,13 @@ package com.piggymetrics.statistics.client;
 import com.piggymetrics.statistics.domain.Currency;
 import com.piggymetrics.statistics.domain.ExchangeRatesContainer;
 import org.junit.Test;
+import org.junit.ClassRule;
 import org.junit.runner.RunWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.junit4.SpringRunner;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 
 import static org.junit.Assert.assertEquals;
@@ -16,6 +18,9 @@ import static org.junit.Assert.assertNotNull;
 @RunWith(SpringRunner.class)
 @SpringBootTest
 public class ExchangeRatesClientTest {
+
+	@ClassRule
+	public static final ExchangeRatesTestServer RATES_SERVER = new ExchangeRatesTestServer();
 
 	@Autowired
 	private ExchangeRatesClient client;
@@ -32,6 +37,8 @@ public class ExchangeRatesClientTest {
 		assertNotNull(container.getRates().get(Currency.USD.name()));
 		assertNotNull(container.getRates().get(Currency.EUR.name()));
 		assertNotNull(container.getRates().get(Currency.RUB.name()));
+		assertNotNull(container.getRates().get(Currency.JPY.name()));
+		assertEquals(new BigDecimal("147.85"), container.getRates().get(Currency.JPY.name()));
 	}
 
 	@Test

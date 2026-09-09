@@ -129,11 +129,13 @@ function initGreetingPage() {
 
 function initSettingsPage() {
     switch (user.checkedCurr) {
-        case "RUB": $("#rublesign").css({"background-position": "-150px 0"});
+        case "RUB": $("#rublesign").show().css({"background-position": "-150px 0"});
             break;
-        case "EUR": $("#rublesign").css({"background-position": "-386px 0"});
+        case "EUR": $("#rublesign").show().css({"background-position": "-386px 0"});
             break;
-        case "USD": $("#rublesign").css({"background-position": "-354px 0"});
+        case "USD": $("#rublesign").show().css({"background-position": "-354px 0"});
+            break;
+        case "JPY": $("#rublesign").hide();
             break;
     }
 
@@ -288,6 +290,8 @@ function checkCurrency(currency) {
         case "USD": currencyText="$";
             break;
         case "EUR": currencyText="&euro;";
+            break;
+        case "JPY": currencyText="&yen;";
             break;
     }
     return currencyText
@@ -901,11 +905,13 @@ function jsonDataSave() {
 function fadeStatistic() {
 
     switch (user.checkedCurr) {
-        case "RUB": $("#rublesign").css({"background-position": "-150px 0"});
+        case "RUB": $("#rublesign").show().css({"background-position": "-150px 0"});
             break;
-        case "EUR": $("#rublesign").css({"background-position": "-386px 0"});
+        case "EUR": $("#rublesign").show().css({"background-position": "-386px 0"});
             break;
-        case "USD": $("#rublesign").css({"background-position": "-354px 0"});
+        case "USD": $("#rublesign").show().css({"background-position": "-354px 0"});
+            break;
+        case "JPY": $("#rublesign").hide();
             break;
     }
     $("#savingsvalue").autoNumeric('set', savings.freeMoney);

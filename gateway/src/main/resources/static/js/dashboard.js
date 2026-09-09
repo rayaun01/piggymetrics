@@ -77,6 +77,8 @@ function getConverted(column) {
 				break;
 			case "USD": column[key].converted = (column[key].amount * global.usd).toFixed(3);
 				break;
+			case "JPY": column[key].converted = (column[key].amount * global.jpy).toFixed(3);
+				break;
 		}
 		switch (column[key].period) {
 			case "MONTH": break;
@@ -94,6 +96,8 @@ function getConverted(column) {
 			case "EUR": column[key].converted = (column[key].converted / global.eur).toFixed(3);
 				break;
 			case "USD": column[key].converted = (column[key].converted / global.usd).toFixed(3);
+				break;
+			case "JPY": column[key].converted = (column[key].converted / global.jpy).toFixed(3);
 				break;
 		}
 		if (column == incomes) {
@@ -119,23 +123,18 @@ function getConverted(column) {
 function initStatisticPage() {
 
 	changeCurrency = function () {
-		switch (user.checkedCurr) {
-			case "RUB":
-				if (user.lastCurr == "RUB") { break; }
-				else if (user.lastCurr == "USD") { savings.freeMoney = (savings.freeMoney * global.usd).toFixed(3); }
-				else if (user.lastCurr == "EUR") { savings.freeMoney = (savings.freeMoney * global.eur).toFixed(3); }
-				break;
-			case "EUR":
-				if (user.lastCurr == "EUR") { break; }
-				else if (user.lastCurr == "USD") { savings.freeMoney = (savings.freeMoney * global.usd / global.eur).toFixed(3); }
-				else if (user.lastCurr == "RUB") { savings.freeMoney = (savings.freeMoney / global.eur).toFixed(3); }
-				break;
-			case "USD":
-				if (user.lastCurr == "USD") { break; }
-				else if (user.lastCurr == "EUR") { savings.freeMoney = (savings.freeMoney * global.eur / global.usd).toFixed(3); }
-				else if (user.lastCurr == "RUB") { savings.freeMoney = (savings.freeMoney / global.usd).toFixed(3); }
-				break;
+		function rubRate(currency) {
+			switch (currency) {
+				case "EUR": return global.eur;
+				case "USD": return global.usd;
+				case "JPY": return global.jpy;
+				default: return 1;
+			}
 		}
+
+		savings.freeMoney =
+			(savings.freeMoney * rubRate(user.lastCurr) /
+				rubRate(user.checkedCurr)).toFixed(3);
 		user.lastCurr = user.checkedCurr;
 	};
 

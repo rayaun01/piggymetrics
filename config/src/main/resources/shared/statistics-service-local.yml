@@ -1,0 +1,13 @@
+security:
+  oauth2:
+    client:
+      accessTokenUri: http://${AUTH_HOST:localhost}:5000/uaa/oauth/token
+
+spring:
+  data:
+    mongodb:
+      host: ${MONGO_HOST:localhost}
+      database: piggymetrics_statistics
+
+rates:
+  url: "${RATES_URL:http://localhost:18080}"
