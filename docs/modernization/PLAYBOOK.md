@@ -336,3 +336,85 @@ configurations and the statistics `DBObject` converters continue to register
 and apply under Spring Data MongoDB 3.0.9 and MongoDB driver 4.0.6. Do not
 accept a green test count if a converter is silently ignored. The full-reactor
 T0 and any T1 re-run remain stage gates after the ordered fan-out.
+
+## 7. Additional Stage 2 runtime findings
+
+### OAuth2 bean-definition override
+
+The three services using `@EnableOAuth2Client` are:
+
+- `account-service/src/main/java/com/piggymetrics/account/AccountApplication.java:13`
+- `statistics-service/src/main/java/com/piggymetrics/statistics/StatisticsApplication.java:23`
+- `notification-service/src/main/java/com/piggymetrics/notification/NotificationServiceApplication.java:20`
+
+Their shared Config Server files also contain `security.oauth2.client.*`:
+
+- `config/src/main/resources/shared/account-service.yml:1-8`
+- `config/src/main/resources/shared/statistics-service.yml:1-8`
+- `config/src/main/resources/shared/notification-service.yml:1-8`
+
+Under Boot 2.3, this combination registers two definitions named
+`oauth2ClientContext`: Spring Security OAuth's request-scoped proxy from
+`@EnableOAuth2Client` and Boot OAuth autoconfiguration's singleton-scoped
+definition, activated by the secured client properties. Boot 2.1 changed the
+default `spring.main.allow-bean-definition-overriding` to `false`, so refresh
+failed with `BeanDefinitionOverrideException`. The register citations for the
+OAuth stack are `docs/as-is/05-dependency-and-eol-register.md:101`,
+`:242-243`, `:342-343`, and `:375-379`.
+
+T0 did not expose this because the test contexts received Config Server 401
+responses instead of the secured `security.oauth2.client.*` properties; the
+OAuth autoconfiguration path therefore backed off in those tests. A shared
+Config Server attempt was packaged and served, but it did not prevent the
+runtime collision. The empirically effective fix is:
+
+```yaml
+spring:
+  main:
+    allow-bean-definition-overriding: true
+```
+
+in each affected service's own:
+
+- `account-service/src/main/resources/bootstrap.yml`
+- `statistics-service/src/main/resources/bootstrap.yml`
+- `notification-service/src/main/resources/bootstrap.yml`
+
+Do not put this setting in `shared/application.yml`, and do not rely on
+delivery from the Config Server for this early bootstrap property. The
+negative Config Server result is recorded in
+`/home/ubuntu/stage2/artifacts/config-verify-oauth-override.log` and the
+failed service evidence; the successful restart is
+`/home/ubuntu/stage2/artifacts/t1-after-start-2.log`.
+
+### Stale T1 MongoDB process
+
+Before a T1 restart, run the documented stop path and verify that no stale
+`mongod` still owns port `27017`. A pre-bump process left behind by the stop
+path caused `start-local.sh` to fail with:
+
+```text
+ERROR: child process failed, exited with error number 48
+```
+
+The MongoDB log gave the underlying error verbatim:
+
+```text
+listen(): bind() failed errno:98 Address already in use for socket: 127.0.0.1:27017
+addr already in use
+Failed to set up sockets during startup.
+```
+
+Clear the stale process through MongoDB's documented shutdown path using the
+same runtime database directory:
+
+```bash
+/usr/local/bin/mongod \
+  --dbpath /home/ubuntu/repos/piggymetrics/.demo-runtime/mongodb-data \
+  --shutdown
+```
+
+Then retry the normal start command. Do not
+change the harness or silently continue with a mixed pre-bump/post-bump
+runtime. The successful retry reached `T1 core stack is ready` in
+`/home/ubuntu/stage2/artifacts/t1-after-start-2.log`.
