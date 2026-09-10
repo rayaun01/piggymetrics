@@ -18,7 +18,7 @@ Skill: `.agents/skills/modernization-brief/SKILL.md`.
 | --- | --- | --- |
 | 1. EOSL documentation discovery gate | **passed with one accepted gap** | `docs/as-is/01-system-context-and-topology.md` (337 lines), `03-api-contract-inventory.md` (334), `04-data-model-and-ownership.md` (595), `05-dependency-and-eol-register.md` (633) all exist and are cited throughout this brief and the catalog. Each carries its own "Open items for runtime verification" list and none of those items is a completeness blocker. **Accepted gap:** there is no `docs/as-is/02-*` document; the discovery set is bound by name to exactly these four artifacts (`.agents/skills/modernization-assess-map/SKILL.md:15-25`) and no artifact, skill or workflow in the repository cites an `02`. Resolved as a numbering artefact — no `02` document is authored (`docs/modernization/PREFLIGHT.md`, Check 6) |
 | 2. Uplift gate | **passed** | `docs/modernization/DELTA-CATALOG.md` exists, derived from the exact pins Boot `2.0.3.RELEASE` / Spring Cloud `Finchley.RELEASE` / Java `1.8` (`pom.xml:11-22`) against the per-stage target pins; 25 confirmed deltas, 0 tool-derived (OpenRewrite did not run) |
-| 3. Approval gate | **OPEN — blocks all migration** | see [Approval block](#8-approval-block). No stage may execute until this is recorded |
+| 3. Approval gate | **passed — approved 2026-09-09, unconditional** | see [Approval block](#8-approval-block) |
 | 4. Pilot migration gate | **defined, not yet satisfied** | pilot is `account-service`; requires its diff, catalog feedback, `docs/modernization/PLAYBOOK.md`, and its target-toolchain proof in a PR before any fan-out |
 
 ## 1. Objective
@@ -228,20 +228,17 @@ and when it blocks.
 
 ## 8. Approval block
 
-**Gate 3 — Approval gate. State: OPEN. Migration is blocked.**
-
-An absent or conditional approval blocks migration. No stage branch, tag, PR,
-or source edit may be created until the decision below is recorded in this
-file.
+**Gate 3 — Approval gate. State: RECORDED — approved. Migration may begin at
+stage 1.**
 
 | Field | Value |
 | --- | --- |
-| Decision | ☐ Approved ☐ Approved with conditions ☐ Rejected — **not yet recorded** |
-| Approver name | _to be recorded_ |
+| Decision | ☑ **Approved** (unconditional) |
+| Approver name | Ray (`rayaun`) |
 | Approver role | human approver (repository owner) |
-| Date | _to be recorded_ |
+| Date | 2026-09-09 |
 | Scope approved | Stages 1–5 as written in §3, one stage per branch/tag/PR, with `account-service` as the pilot and the shared files owned by the orchestrating session |
-| Conditions | _to be recorded_ |
+| Conditions | None recorded. Verbatim: "I have reviewed your documentation. Proceed to Phase 2" |
 | Artifacts reviewed | `docs/modernization/PREFLIGHT.md`, `docs/modernization/DELTA-CATALOG.md`, this brief, and `docs/as-is/01`, `03`, `04`, `05` |
 
 What approval authorizes, and nothing more:
@@ -262,5 +259,6 @@ What approval authorizes, and nothing more:
 4. Stages are never combined. Any deviation from §3 cites the register fact
    that forces it.
 
-Answers to the blocking open questions in §7 (items 1, 3, 4) may be recorded in
-the Conditions row; until they are answered, the stages they block do not start.
+The approval carries no conditions, so the blocking open questions in §7 (items
+1, 3, 4) are delegated to the executing session, which must record the decision
+it takes and the register fact behind it in the stage PR.
