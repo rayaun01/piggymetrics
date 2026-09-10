@@ -3,9 +3,9 @@
 Source of truth for the findings: code scan
 `scan-abc9de1997d146da80002131c5d569bc` ("Piggymetrics EOL security audit — Java
 + .NET, egress attack surface"), completed 2026-09-10. 53 findings: 36 open, 17
-dismissed; 3 critical and 6 high, all open. This document is an **amendment
-proposal** to `BRIEF.md` §3 and does not itself authorize any work — see
-§6 below, which re-opens the Approval gate for the amended scope.
+dismissed; 3 critical and 6 high, all open. This document is the **approved amendment**
+to `BRIEF.md` §3 (Gate 3, amendment 1, approved 2026-09-10; see §6). Stage 1b
+still executes only after stage 1 is accepted — stages are not combined.
 
 ## 1. The question this answers
 
@@ -128,17 +128,20 @@ deployed.
 | 5 | Unchanged, plus: final scan re-run as stage proof |
 
 `BRIEF.md` §3 was approved unconditionally on 2026-09-09 as a five-stage ladder.
-Inserting stage 1b and adding exit criteria to stages 2–5 **changes the approved
-scope**, so Gate 3 applies: this amendment needs the human approver's decision
-before stage 1b executes. Stage 1 is unaffected and continues.
+Inserting stage 1b and adding exit criteria to stages 2–5 changed the approved
+scope, so Gate 3 was re-opened and **approved unconditionally on 2026-09-10** by
+Ray (`rayaun`), recorded in `BRIEF.md` §8 as amendment 1. Verbatim: "Stage 1b
+insertion. Okay with generated per run secret".
 
-Open question added to `BRIEF.md` §7: **what replaces the committed `.env` for
-local development?** This blocks stage 1b, not stage 1.
+Stage 1 is unaffected and continues; stage 1b begins only once stage 1 is
+accepted.
 
-### 6.1 Recommended answer: generated per run
+`BRIEF.md` §7 open question 9 — **what replaces the committed `.env` for local
+development?** — is answered by the same approval.
 
-Recorded as the executing session's preference, still subject to the approver's
-ratification.
+### 6.1 Decided: generated per run
+
+Approved 2026-09-10 alongside the stage insertion.
 
 The apparent trade-off ("reproducible T1" versus "stricter") mostly dissolves on
 inspection. The golden master is the T1 **response text** — credentials never

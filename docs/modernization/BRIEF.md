@@ -71,6 +71,7 @@ proposed reordering must cite the register fact that forces it.
 | ---: | --- | --- | --- | --- |
 | 0 | Stage-0 harness and frozen baseline | The baseline must be recoverable and cited | `stage-0-baseline` (**done**, `6d42cc7`) | T0/T1 records and revision |
 | 1 | JaCoCo, flapdoodle, and test-runner infrastructure (D-08, D-09, D-10, D-19) | JaCoCo `0.7.6` fails in the agent before any test on newer class files; flapdoodle `1.50.3` is tied to the Mongo 3.x driver; JUnit 4 / Mockito `2.15.0` blocks later runtime work (`05-…:33-40`) | `stage-1-test-infrastructure` | T0 pass/fail table, **both** `mvn -B -fae verify` and `-Pfull verify` (`monitoring` and `turbine-stream-service` carry JUnit 4 tests too) |
+| 1b | Security baseline: committed credentials, host-published internal ports, unauthenticated Eureka, PII logging (`SECURITY-REMEDIATION-PLAN.md` §2) | 3 open criticals are reachable today and the fixes carry no Boot/Cloud coupling, so they must not wait four stages; scan `scan-abc9de1997d146da80002131c5d569bc` | `stage-1b-security-baseline` | T0 both profiles, plus a **re-captured** T1 golden master with every diff adjudicated as intended |
 | 2 | Boot `2.3.12` + Spring Cloud `Hoxton.SR12` (D-01, D-16, D-23, and flapdoodle's driver-coupled half) | The last generation where the old Netflix modules and the next supported Boot generation coexist (`05-…:365-368`) | `stage-2-boot-23-hoxton` | T0 plus T1 |
 | 3 | Zuul, Hystrix, Ribbon, Turbine, dashboard, OAuth2 retirement/replacement (D-03…D-07, D-18, D-24) | Those Netflix artifacts are not built in 2020.0+; `spring-security-oauth2-autoconfigure` has no GA beyond `2.6.8`, so the rework cannot wait for Boot 2.7 (`05-…:300-308`, `05-…:375-379`) | `stage-3-netflix-oauth` | T0/T1 and route/security proof |
 | 4 | Boot `2.7`, Spring Cloud `2021.0`, JDK 17 (D-02, D-13, D-20, D-21, D-22) | Boot 2.3 supports only through Java 15; Boot 2.7 is the compatible bridge to Java 17 (`05-…:350-356`) | `stage-4-boot-27-jdk17` | T0/T1 dual-run |
@@ -82,16 +83,16 @@ infrastructure is split out of `S1` into its own stage because JaCoCo and
 flapdoodle break the build **before any test runs**, which makes them a
 prerequisite rather than work that rides along (`05-…:42-43`).
 
-**Proposed amendment — pending Gate 3, not yet approved.** Code scan
-`scan-abc9de1997d146da80002131c5d569bc` (2026-09-10) reports 36 open findings,
-3 critical. `docs/modernization/SECURITY-REMEDIATION-PLAN.md` sequences them
-against this ladder and proposes one new stage **1b `stage-1b-security-baseline`**
-(committed credentials, host-published internal ports, unauthenticated Eureka,
-PII logging) plus security exit criteria on stages 2–5. Stage 1b is placed after
-stage 1 and before stage 2 because it deliberately changes T1 responses and
-therefore **re-captures the golden master** that stages 2–5 compare against.
-Stage 1 is unaffected by the amendment. Until the approver rules, the approved
-ladder is the five stages in the table above.
+**Stage 1b — amendment approved 2026-09-10** (§8, amendment record). Code scan
+`scan-abc9de1997d146da80002131c5d569bc` reports 36 open findings, 3 critical;
+`docs/modernization/SECURITY-REMEDIATION-PLAN.md` sequences them against this
+ladder. Stage 1b sits after stage 1 and before stage 2 because it deliberately
+changes T1 responses and therefore **re-captures the golden master** that stages
+2–5 compare against; stage 1 is behaviour-neutral and unaffected. Stages 2–5
+also gain security exit criteria (plan §3, §4): stage 2 asserts CVE-2020-5412
+closure, stage 3 must replace scope-only object authorization rather than port
+`hasScope('server')` verbatim, stage 4 asserts the EOL base images move, stage 5
+re-runs the scan.
 
 Ownership: the orchestrating session owns coordinated cuts and the shared files
 `config/src/main/resources/shared/*.yml` and `pom.xml`. **Delegated units never
@@ -249,10 +250,10 @@ and when it blocks.
    `seed-local.sh:6`), so removing the committed defaults breaks T1 unless the
    harness generates a secret per run. A generated secret keeps T1
    reproducible; a developer-supplied secret is stricter but makes the golden
-   master environment-dependent. **Preferred answer recorded** (generated per
-   run, fail closed, env-var-only injection —
-   `docs/modernization/SECURITY-REMEDIATION-PLAN.md` §6.1); awaiting the
-   approver. Blocks the proposed stage 1b, not stage 1.
+   master environment-dependent. **ANSWERED 2026-09-10 — generated per run**,
+   fail closed, env-var-only injection
+   (`docs/modernization/SECURITY-REMEDIATION-PLAN.md` §6.1). Verbatim: "Okay
+   with generated per run secret". No longer blocks stage 1b.
 10. **Memory headroom under Boot 3 defaults** with `-Xmx200m` /
    `-XX:MaxMetaspaceSize=128m` (`05-…:609-610`, D-21). Measurable only once a
    unit reaches Boot 3; blocks the stage-5 T1 tier if it fails.
@@ -271,6 +272,14 @@ stage 1.**
 | Scope approved | Stages 1–5 as written in §3, one stage per branch/tag/PR, with `account-service` as the pilot and the shared files owned by the orchestrating session |
 | Conditions | None recorded. Verbatim: "I have reviewed your documentation. Proceed to Phase 2" |
 | Artifacts reviewed | `docs/modernization/PREFLIGHT.md`, `docs/modernization/DELTA-CATALOG.md`, this brief, and `docs/as-is/01`, `03`, `04`, `05` |
+
+**Amendment 1 — approved 2026-09-10.** Scope extended to insert stage 1b
+(`stage-1b-security-baseline`) between stages 1 and 2 and to add the security
+exit criteria on stages 2–5, per
+`docs/modernization/SECURITY-REMEDIATION-PLAN.md`. Approver: Ray (`rayaun`),
+unconditional. Verbatim: "Stage 1b insertion. Okay with generated per run
+secret". Open question 9 is answered by the same message. Stage 1b still
+executes only after stage 1 is accepted — stages are not combined.
 
 What approval authorizes, and nothing more:
 
