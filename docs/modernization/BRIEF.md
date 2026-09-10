@@ -7,7 +7,7 @@ Skill: `.agents/skills/modernization-brief/SKILL.md`.
 | `SYSTEM` | `piggymetrics` (nine Java/Maven units) |
 | `SOURCE_VERSION` | Java 8 / Spring Boot `2.0.3.RELEASE` / Spring Cloud `Finchley.RELEASE` (`pom.xml:11-22`) |
 | `TARGET_VERSION` | Java 17 / Spring Boot `3.0.13` / Spring Cloud `2022.0.x` |
-| `BASELINE_REVISION` | tag `stage-0-baseline` (`6d42cc7`) |
+| `BASELINE_REVISION` | annotated tag `stage-0-baseline` (`951f6b0`, peeling to commit `6d42cc7`), local and on `origin` |
 | `AS_IS_DIR` | `docs/as-is` (01, 03, 04, 05) |
 | `DELTA_CATALOG_PATH` | `docs/modernization/DELTA-CATALOG.md` |
 | `PREFLIGHT_PATH` | `docs/modernization/PREFLIGHT.md` |
@@ -49,7 +49,7 @@ Only the changes the catalog forces. No redesign:
 | Service discovery | Eureka client/server `2.0.0.RELEASE` | **same components**, version-bumped per train | D-dropped — Eureka is the one Netflix module still shipped in 4.x |
 | Resilience | Hystrix + `@EnableCircuitBreaker` | Resilience4j via `spring-cloud-starter-circuitbreaker-resilience4j` | D-05 |
 | Load balancing | Ribbon `2.2.5` (transitive) + `ribbon.*` | Spring Cloud LoadBalancer | D-06 |
-| Circuit-breaker metrics | Hystrix stream + `monitoring` dashboard + `turbine-stream-service` | **deleted** — no Micrometer replacement is built, because the baseline serves no stream to replace | D-07 |
+| Circuit-breaker metrics | Hystrix AMQP stream + `monitoring` dashboard + `turbine-stream-service` | **deleted**, no Micrometer replacement built — `turbine-core` has no GA 2.x at any Boot 2.7/3 compatible version; whether working behaviour is being removed is measured in T3 first | D-07 |
 | Authn/authz | `spring-cloud-starter-oauth2` + `spring-security-oauth2` (opaque tokens, `CustomUserInfoTokenServices`) | Spring Authorization Server + native Spring Security resource server, still opaque tokens | D-04; JWTs are explicitly **not** adopted |
 | Tracing | Spring Cloud Sleuth | Micrometer Tracing (`micrometer-tracing-bridge-brave`) | D-14 |
 | Persistence | MongoDB driver `3.6.4`, Spring Data Mongo | driver `4.8.2`, unchanged `BigDecimal` representation | D-16 |
@@ -70,7 +70,7 @@ proposed reordering must cite the register fact that forces it.
 | Stage | What moves | Forcing fact | Branch / tag | Proof |
 | ---: | --- | --- | --- | --- |
 | 0 | Stage-0 harness and frozen baseline | The baseline must be recoverable and cited | `stage-0-baseline` (**done**, `6d42cc7`) | T0/T1 records and revision |
-| 1 | JaCoCo, flapdoodle, and test-runner infrastructure (D-08, D-09, D-10, D-19) | JaCoCo `0.7.6` fails in the agent before any test on newer class files; flapdoodle `1.50.3` is tied to the Mongo 3.x driver; JUnit 4 / Mockito `2.15.0` blocks later runtime work (`05-…:33-40`) | `stage-1-test-infrastructure` | T0 pass/fail table |
+| 1 | JaCoCo, flapdoodle, and test-runner infrastructure (D-08, D-09, D-10, D-19) | JaCoCo `0.7.6` fails in the agent before any test on newer class files; flapdoodle `1.50.3` is tied to the Mongo 3.x driver; JUnit 4 / Mockito `2.15.0` blocks later runtime work (`05-…:33-40`) | `stage-1-test-infrastructure` | T0 pass/fail table, **both** `mvn -B -fae verify` and `-Pfull verify` (`monitoring` and `turbine-stream-service` carry JUnit 4 tests too) |
 | 2 | Boot `2.3.12` + Spring Cloud `Hoxton.SR12` (D-01, D-16, D-23, and flapdoodle's driver-coupled half) | The last generation where the old Netflix modules and the next supported Boot generation coexist (`05-…:365-368`) | `stage-2-boot-23-hoxton` | T0 plus T1 |
 | 3 | Zuul, Hystrix, Ribbon, Turbine, dashboard, OAuth2 retirement/replacement (D-03…D-07, D-18, D-24) | Those Netflix artifacts are not built in 2020.0+; `spring-security-oauth2-autoconfigure` has no GA beyond `2.6.8`, so the rework cannot wait for Boot 2.7 (`05-…:300-308`, `05-…:375-379`) | `stage-3-netflix-oauth` | T0/T1 and route/security proof |
 | 4 | Boot `2.7`, Spring Cloud `2021.0`, JDK 17 (D-02, D-13, D-20, D-21, D-22) | Boot 2.3 supports only through Java 15; Boot 2.7 is the compatible bridge to Java 17 (`05-…:350-356`) | `stage-4-boot-27-jdk17` | T0/T1 dual-run |
@@ -140,10 +140,13 @@ variant adds `monitoring` and `turbine-stream-service` for 61.
 - The `DataPoint` id date depends on the container's default time zone, and the
   Dockerfiles set no `TZ` (`05-…:478`); a base-image change that alters the
   default zone shifts historical keys by a day (D-22).
-- The Hystrix metrics path is already inert in the measured tiers: no
-  `management.endpoints.web.exposure.include` exists, so `/hystrix.stream` is
-  404 everywhere, and no broker runs in T1/T2 (`05-…:255-262`, `05-…:562`).
-  Nothing there needs preserving.
+- The Hystrix metrics path is **unmeasured, not proven inert**. `/hystrix.stream`
+  is 404 everywhere in T1 (`05-…:562`), but `spring-cloud-netflix-hystrix-stream`
+  publishes over RabbitMQ and no broker runs in T1 or T2
+  (`03-…:132`); only T3 starts the broker with the publishers, Turbine, and the
+  dashboard. D-07 deletes the tier because no GA artifact exists to upgrade to,
+  and the stage-3 session must first run the T3 AMQP pipeline and record in
+  `BASELINE.md` whether that path worked.
 
 ## 5. Behaviour contract
 
@@ -151,12 +154,20 @@ variant adds `monitoring` and `turbine-stream-service` for 61.
   session **before** any source edit, containing the T0 per-module pass/fail
   table, the recorded T1 wire text with the exact serialized values above
   (`0.0330`, `0.6800`, `"USD":1`, `"JPY":147.85`, `+0000`), the captured
-  `BASELINE_REVISION`, and whether the proof is dual-run or target-only
+  `BASELINE_REVISION`, the T3 AMQP result for D-07, and whether the proof is
+  dual-run or target-only
   (`.agents/skills/modernization-uplift/SKILL.md:119-128`).
 - **Golden master:** the T1 wire text, compared **as text**, not as parsed
   numbers — parsing destroys the scale that is the contract (`04-…:428`).
 - **Baseline revision:** tag `stage-0-baseline` (`6d42cc7`), inspected by
   checkout at that revision, never by copying a directory.
+- **The recorded oracles predate that tag and each other:** the T1 wire capture
+  was taken at `d91f384` and the T0 run recorded in the preflight at `4bbdc10`,
+  both stage-0 documentation-only descendants of `6d42cc7` that change no Java
+  source, POM, or shared YAML. The executing session must therefore **re-run
+  both oracles at a single revision** (`stage-0-baseline`, or the stage branch
+  point) and record that revision in `BASELINE.md`; the values above are the
+  expected result, not a substitute for that run.
 - **Triage rule for every result delta:** compare results, not exit codes.
   Every difference is classified as (a) intended, with the catalog delta and
   the register fact that forces it, (b) a regression, which blocks the stage,

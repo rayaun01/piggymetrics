@@ -193,13 +193,22 @@ under `-Pfull` (`pom.xml:46-54`), so a default `mvn verify` never compiles them.
 service entries.
 **Forcing fact (two, independent):** the artifacts are removed from the train
 in 2020.0, and `turbine-core` already resolves to the non-GA `2.0.0-DP.2` with
-**no GA 2.x to upgrade to** (`05-…:131-136`, `05-…:303`). Runtime evidence:
-`/hystrix.stream` returns 404 on every port because no
-`management.endpoints.web.exposure.include` exists anywhere in the repo, so the
-tier aggregates a stream nothing serves (`05-…:562`).
-**Judgment content:** there is no behaviour to preserve, so this is deletion,
-not migration. Open item 8 in `05-…:622-629` is the discriminating check
-(exposed-but-inert vs. absent) and only changes the wording of the note.
+**no GA 2.x to upgrade to** (`05-…:131-136`, `05-…:303`). Those two facts alone
+force the deletion: there is no artifact to upgrade to at any Boot 2.7/3
+compatible version.
+**What the HTTP evidence does and does not show:** `/hystrix.stream` returned
+404 on every port in T1 (`05-…:562`), but that does **not** prove the tier is
+inert. `spring-cloud-netflix-hystrix-stream` publishes over **RabbitMQ**, not
+over an HTTP endpoint, and no broker runs in T1 or T2
+(`docs/as-is/03-api-contract-inventory.md:132`). Only T3 starts `rabbitmq:3-management`
+(`docker-compose.yml:3-11`) together with the publishers, Turbine, and the
+dashboard, so the AMQP path is **unmeasured**, not disproved.
+**Judgment content:** whether any dashboard behaviour exists to preserve. The
+executing session must exercise the T3 AMQP pipeline (publisher →
+`/turbine.stream` → `/hystrix`) and record the result in `BASELINE.md` before
+the deletion lands; the deletion proceeds either way, but the PR must state
+whether it removes working monitoring behaviour or an already-dead tier. Open
+item 8 in `05-…:622-629` is that check.
 
 ## D-08 — JaCoCo bump
 
