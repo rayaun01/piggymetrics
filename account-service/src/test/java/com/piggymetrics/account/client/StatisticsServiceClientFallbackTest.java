@@ -1,21 +1,21 @@
 package com.piggymetrics.account.client;
 
 import com.piggymetrics.account.domain.Account;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import com.piggymetrics.account.test.OutputCaptureExtension;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.extension.RegisterExtension;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.rule.OutputCapture;
-import org.springframework.test.context.junit4.SpringRunner;
+import org.springframework.test.context.junit.jupiter.SpringExtension;
 
 import static org.hamcrest.Matchers.containsString;
 
 /**
  * @author cdov
  */
-@RunWith(SpringRunner.class)
+@ExtendWith(SpringExtension.class)
 @SpringBootTest(properties = {
         "feign.hystrix.enabled=true"
 })
@@ -23,10 +23,10 @@ public class StatisticsServiceClientFallbackTest {
     @Autowired
     private StatisticsServiceClient statisticsServiceClient;
 
-    @Rule
-    public final OutputCapture outputCapture = new OutputCapture();
+    @RegisterExtension
+    public final OutputCaptureExtension outputCapture = new OutputCaptureExtension();
 
-    @Before
+    @BeforeEach
     public void setup() {
         outputCapture.reset();
     }
