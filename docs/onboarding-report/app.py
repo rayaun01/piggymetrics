@@ -31,26 +31,56 @@ def _safe_href(value):
 
 def inline_format(value):
     """Render the deliberately small inline syntax supported by the report schema."""
-    text = escape(str(value or ""))
+    text = str(escape(str(value or "")))
     tokens = []
 
-    def remember(match):
-        tokens.append(match.group(0))
+    def remember(kind, value):
+        tokens.append((kind, value))
         return f"\x00{len(tokens) - 1}\x00"
 
-    text = re.sub(r"`([^`]+)`", remember, str(text))
+    text = re.sub(
+        r"`([^`]+)`",
+        lambda match: remember("code", match.group(1)),
+        text,
+    )
     text = re.sub(
         r"\[([^\]]+)\]\(([^)\s]+)\)",
         lambda match: remember(
+            "link",
             f'<a href="{escape(_safe_href(match.group(2)))}" target="_blank" rel="noreferrer">'
             f"{match.group(1)}</a>"
         ),
         text,
     )
-    for index, token in enumerate(tokens):
-        if token.startswith("`") and token.endswith("`"):
-            token = f"<code>{token[1:-1]}</code>"
-        text = text.replace(f"\x00{index}\x00", token)
+    text = re.sub(
+        r"\*\*(.+?)\*\*",
+        lambda match: remember("bold", match.group(1)),
+        text,
+    )
+
+    token_ref = re.compile(r"\x00(\d+)\x00")
+    rendered = {}
+
+    def render_token(index):
+        if index in rendered:
+            return rendered[index]
+        kind, value = tokens[index]
+        content = token_ref.sub(
+            lambda match: render_token(int(match.group(1))),
+            value,
+        )
+        if kind == "code":
+            rendered[index] = f"<code>{content}</code>"
+        elif kind == "bold":
+            rendered[index] = f"<strong>{content}</strong>"
+        else:
+            rendered[index] = content
+        return rendered[index]
+
+    text = token_ref.sub(
+        lambda match: render_token(int(match.group(1))),
+        text,
+    )
     return Markup(text)
 
 

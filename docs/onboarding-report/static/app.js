@@ -53,19 +53,37 @@
     });
   });
 
-  async function renderDiagrams() {
-    const diagrams = [...document.querySelectorAll(".mermaid-diagram")];
-    if (!diagrams.length || !window.mermaid) return;
-    window.mermaid.initialize({ startOnLoad: false, theme: "neutral", securityLevel: "strict" });
-    for (const diagram of diagrams) {
-      try {
-        await window.mermaid.run({ nodes: [diagram] });
-      } catch (error) {
-        diagram.classList.add("diagram-error");
-        diagram.textContent = "Diagram unavailable — use “Show source” to inspect it.";
-      }
+  async function renderDiagram(diagram) {
+    if (!window.mermaid || diagram.dataset.mermaidRendered === "true") return;
+    diagram.textContent = diagram.dataset.source || "";
+    try {
+      await window.mermaid.run({ nodes: [diagram] });
+      diagram.dataset.mermaidRendered = "true";
+    } catch (error) {
+      diagram.classList.add("diagram-error");
+      diagram.textContent = "Diagram unavailable — use “Show source” to inspect it.";
     }
   }
 
-  renderDiagrams();
+  function isInsideClosedToggle(diagram) {
+    return Boolean(diagram.closest("details.toggle-card:not([open])"));
+  }
+
+  async function renderDiagrams(diagrams) {
+    for (const diagram of diagrams) {
+      if (!isInsideClosedToggle(diagram)) await renderDiagram(diagram);
+    }
+  }
+
+  if (window.mermaid) {
+    window.mermaid.initialize({ startOnLoad: false, theme: "neutral", securityLevel: "strict" });
+    renderDiagrams([...document.querySelectorAll(".mermaid-diagram")]);
+    document.querySelectorAll("details.toggle-card").forEach((toggle) => {
+      toggle.addEventListener("toggle", () => {
+        if (toggle.open) {
+          renderDiagrams([...toggle.querySelectorAll(".mermaid-diagram")]);
+        }
+      });
+    });
+  }
 })();
