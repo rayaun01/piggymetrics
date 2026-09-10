@@ -13,20 +13,19 @@ description: Invoke after discovery and delta analysis to bind an approved, stag
 - `DELTA_CATALOG_PATH`: `docs/modernization/DELTA-CATALOG.md`
 - `PREFLIGHT_PATH`: `docs/modernization/PREFLIGHT.md`
 
-No positional arguments or argv parsing. Do not write the brief until the
-discovery artifacts and delta catalog exist.
+No positional arguments or argv parsing.
 
 ## Gates
 
-1. **Discovery gate:** all four `docs/as-is/` artifacts exist, are cited, and
-   have no unresolved completeness blocker.
+1. **EOSL documentation discovery gate:** all four `docs/as-is/` artifacts
+   exist, are cited, and have no unresolved completeness blocker.
 2. **Uplift gate:** `DELTA_CATALOG_PATH` exists and was derived from the exact
    source/target pins. A same-stack uplift has no brief without its catalog.
 3. **Approval gate:** record the approval decision, approver role, date, scope,
    and any conditions. An absent or conditional approval blocks migration.
-4. **Pilot gate:** the staged plan names one representative mid-complexity
-   pilot and requires its diff, catalog feedback, playbook, and proof before
-   fan-out.
+4. **Pilot migration gate:** the staged plan names one representative
+   mid-complexity pilot and requires its diff, catalog feedback, playbook, and
+   proof before fan-out.
 
 ## The Brief
 
