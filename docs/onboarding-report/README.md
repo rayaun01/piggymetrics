@@ -1,6 +1,6 @@
-# PiggyMetrics onboarding report
+# Workshop for Code Migration / Upgrade
 
-This is a small password-gated Flask report for engineers onboarding to the PiggyMetrics Devin demo. The report content lives in `content.json` and is rendered as bilingual English/Japanese rows.
+This is a small password-gated Flask report for engineers onboarding to Devin, built around this repository as the demo subject. The report content lives in `content.json` and is rendered as bilingual English/Japanese rows.
 
 ## Run locally
 
