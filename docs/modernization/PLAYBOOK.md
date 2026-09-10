@@ -178,3 +178,161 @@ stage is most exposed to.
    when a later Boot generation manages it.
 4. **`com.sun.security.auth.UserPrincipal` in controller tests** stays as-is —
    D-18, stage 3.
+
+# Stage 2 playbook — Boot 2.3.12 / Hoxton.SR12 (D-01, D-09 driver-coupled half, D-16, D-23)
+
+Written from the completed `account-service` pilot on
+`stage-2-boot-23-hoxton`. The facts and resolutions below are the observed
+pilot results, not predictions. The pilot artifacts are under
+`/home/ubuntu/stage2/artifacts/`.
+
+## 0. Facts you need before you start
+
+| Fact | Before | After | Evidence |
+| --- | --- | --- | --- |
+| JDK | Temurin 8, `JAVA_HOME=/usr/lib/jvm/temurin-8-jdk-amd64` | unchanged | root enforcer and pilot verify log |
+| Spring Boot parent | `2.0.3.RELEASE` | `2.3.12.RELEASE` | `pom.xml`; `pilot-account-verify.log` |
+| Spring Cloud train | `Finchley.RELEASE` | `Hoxton.SR12` | `pom.xml`; `pilot-account-verify.log` |
+| Spring Data MongoDB | `2.0.8.RELEASE` | `3.0.9.RELEASE` | `pilot-account-deps-before/after-spring-data-mongodb.log` |
+| MongoDB driver (D-16) | `org.mongodb:mongodb-driver`, plus `bson`/`mongodb-driver-core`, `3.6.4` | `org.mongodb:mongodb-driver-sync`, plus `bson`/`mongodb-driver-core`, `4.0.6` | `pilot-account-deps-before/after-mongodb.log` |
+| Flapdoodle (D-09 driver-coupled half) | `de.flapdoodle.embed.mongo:2.0.3`; `embed.process:2.0.2` | `embed.mongo:2.2.0`; `embed.process:2.1.2` | `pilot-account-deps-before/after-flapdoodle.log` |
+| JUnit Jupiter BOM | `5.1.1` | `5.6.3` | `pilot-account-deps-before/after-junit-mockito.log` |
+| Mockito BOM | `2.15.0` | `3.3.3` | `pilot-account-deps-before/after-junit-mockito.log` |
+| Embedded Mongo binary | existing baseline cache | MongoDB `3.5.5` downloaded to `~/.embedmongo` | `pilot-account-verify.log`; `~/.embedmongo/linux/mongodb-linux-x86_64-3.5.5.tgz` |
+
+The flapdoodle change is the driver-coupled half of D-09 that Stage 1
+deliberately deferred. The deferral and its reason are recorded in
+`docs/as-is/05-dependency-and-eol-register.md:312` and
+`docs/modernization/UPLIFT-NOTES.md` §4.
+
+## 1. Shared-file rule
+
+The root `pom.xml` is the only shared edit. Change exactly these two values:
+
+```xml
+<version>2.0.3.RELEASE</version>
+```
+
+to:
+
+```xml
+<version>2.3.12.RELEASE</version>
+```
+
+and:
+
+```xml
+<spring-cloud.version>Finchley.RELEASE</spring-cloud.version>
+```
+
+to:
+
+```xml
+<spring-cloud.version>Hoxton.SR12</spring-cloud.version>
+```
+
+Do not change `java.version`, Surefire, the enforcer, repositories, or Maven
+settings. No other shared file is part of this fan-out.
+
+## 2. Ordered fan-out procedure
+
+1. Finish and commit this playbook before touching a module.
+2. Verify each remaining unit in this order:
+   `auth-service`, `statistics-service`, `notification-service`, `gateway`,
+   `registry`, `config`, `monitoring`, `turbine-stream-service`.
+3. Do not move to the next unit until the current unit has the expected
+   baseline test count and zero failures, errors, and skips.
+4. `monitoring` and `turbine-stream-service` use the `full` profile.
+5. Do not modify tests or change production behavior to make a test pass.
+
+The pilot showed that Boot 2.3's `spring-boot-starter-web` no longer supplies
+the validation starter by itself. `account-service` nevertheless compiled
+without a direct validation dependency because its
+`spring-cloud-netflix-hystrix-stream -> spring-cloud-stream ->
+spring-boot-starter-validation:2.3.12.RELEASE` path supplied it transitively.
+The current `auth-service` and `gateway` POMs have no Hystrix-stream path, so
+they must be checked independently; do not infer their validation classpath
+from the account pilot. This transitive supply disappears when Netflix and
+Hystrix are retired in a later stage.
+
+Under Boot 2.3, `EmbeddedMongoAutoConfiguration` still drives Flapdoodle. The
+pilot log showed `o.s.b.a.mongo.embedded.EmbeddedMongo` starting MongoDB 3.5.5
+and `d.f.embed.mongo.MongodExecutable` starting the process. This is not the
+Boot 3 removal yet.
+
+## 3. Allowed module changes
+
+Only make a change when the current build or behavior proves it necessary:
+
+* Add an unversioned `org.springframework.boot:spring-boot-starter-validation`
+  dependency only after a module fails to compile on `javax.validation`.
+* If `CustomConversions` no longer resolves or is silently ignored, replace
+  it in both `statistics-service` and `notification-service` with
+  `MongoCustomConversions` consistently: import, bean return type, and `new`
+  expression. The bean must be typed as `MongoCustomConversions`, because
+  `MongoDataAutoConfiguration` backs off on a bean of that type.
+* If compilation or a behavior test proves the old converters are no longer
+  applied, migrate the statistics converters from `DBObject`/
+  `BasicDBObject` to `org.bson.Document`. Preserve the exact document shape:
+  put `date` first as `java.util.Date`, then `account` as `String`; read those
+  same fields with the same casts.
+
+The pilot identified these fan-out hazards but did not change them:
+
+* `statistics-service` and `notification-service` define custom Mongo
+  conversion beans.
+* `statistics-service` has `DataPointIdReaderConverter` and
+  `DataPointIdWriterConverter` using `com.mongodb.DBObject` and
+  `com.mongodb.BasicDBObject`.
+* The post-pilot driver tree no longer contains the legacy
+  `org.mongodb:mongodb-driver` artifact, so these must be proven during the
+  statistics-service build rather than assumed safe.
+
+## 4. Commands
+
+Use Temurin 8 on every Maven invocation:
+
+```bash
+JAVA_HOME=/usr/lib/jvm/temurin-8-jdk-amd64 mvn -B -pl <unit> verify
+JAVA_HOME=/usr/lib/jvm/temurin-8-jdk-amd64 mvn -B -pl monitoring -Pfull verify
+JAVA_HOME=/usr/lib/jvm/temurin-8-jdk-amd64 mvn -B -pl turbine-stream-service -Pfull verify
+JAVA_HOME=/usr/lib/jvm/temurin-8-jdk-amd64 mvn -B -fae verify
+JAVA_HOME=/usr/lib/jvm/temurin-8-jdk-amd64 mvn -B -fae -Pfull verify
+```
+
+The pilot dependency checks were:
+
+```bash
+JAVA_HOME=/usr/lib/jvm/temurin-8-jdk-amd64 mvn -B -pl account-service dependency:tree -Dincludes=de.flapdoodle.embed:*
+JAVA_HOME=/usr/lib/jvm/temurin-8-jdk-amd64 mvn -B -pl account-service dependency:tree -Dincludes=org.mongodb:*
+JAVA_HOME=/usr/lib/jvm/temurin-8-jdk-amd64 mvn -B -pl account-service dependency:tree -Dincludes=org.springframework.data:spring-data-mongodb
+JAVA_HOME=/usr/lib/jvm/temurin-8-jdk-amd64 mvn -B -pl account-service dependency:tree -Dincludes=org.junit.jupiter:*,org.mockito:*
+JAVA_HOME=/usr/lib/jvm/temurin-8-jdk-amd64 mvn -B -pl account-service dependency:tree -Dincludes=org.springframework.boot:spring-boot-starter-validation
+```
+
+Save each unit's complete output under
+`/home/ubuntu/stage2/artifacts/fanout-<unit>.log`. Compare both module and
+class counts to `docs/modernization/BASELINE.md` §2.
+
+## 5. Observed pilot errors and resolutions
+
+| Observed first line | Resolution |
+| --- | --- |
+| `WARNING: TestEngine with ID 'junit-vintage' failed to discover tests` | Red-herring discovery warning caused by the intentionally excluded JUnit 4 class; the Jupiter suite still ran. No code change. |
+| `Could not locate PropertySource: 401 ... "Unauthorized"` | Non-fatal test-context warning; no change. |
+| `Broker not available; cannot force queue declarations during start: java.net.ConnectException: Connection refused (Connection refused)` | RabbitMQ was not part of the narrow unit run; no change. |
+| `Error during update statistics for account: test` | Expected output asserted by `StatisticsServiceClientFallbackTest`; no change. |
+| `Resolved [org.springframework.web.bind.MethodArgumentNotValidException: Validation failed for argument ...]` | Expected controller validation output; no change. |
+| `Registering converter from class java.time.LocalDateTime to class org.joda.time.LocalDateTime as reading converter ...` | Non-fatal Spring Data warning; no change. |
+
+The pilot had no compilation errors, test failures, dependency failures, or
+forced production API migrations. The final result was 14 tests,
+0 failures/errors/skips.
+
+## 6. Remaining gaps
+
+The remaining fan-out work must establish whether the two custom-conversion
+configurations and the statistics `DBObject` converters continue to register
+and apply under Spring Data MongoDB 3.0.9 and MongoDB driver 4.0.6. Do not
+accept a green test count if a converter is silently ignored. The full-reactor
+T0 and any T1 re-run remain stage gates after the ordered fan-out.
