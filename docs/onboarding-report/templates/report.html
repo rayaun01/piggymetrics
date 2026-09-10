@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="{{ content.meta.title_en }}">
+  <title>{{ content.meta.title_en|default("Workshop for Code Migration / Upgrade") }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+  <header class="topbar">
+    <a class="wordmark" href="{{ url_for('report') }}">Devin <span>Workshop</span></a>
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="side-nav">Sections <span>＋</span></button>
+    <div class="topbar-actions">
+      <div class="view-switcher" aria-label="Language view">
+        <button class="view-button" data-view="en" type="button">EN</button>
+        <span>/</span>
+        <button class="view-button" data-view="ja" type="button">日本語</button>
+        <span>/</span>
+        <button class="view-button is-active" data-view="both" type="button">Both</button>
+      </div>
+      <a class="logout-link" href="{{ url_for('logout') }}">Log out</a>
+    </div>
+  </header>
+
+  <div class="page-shell">
+    <aside class="sidebar" id="side-nav">
+      <nav aria-label="Report sections">
+        <p class="side-label">CONTENTS</p>
+        {% for section in content.sections|default([]) %}
+        <a class="toc-link{% if loop.first %} is-active{% endif %}" href="#{{ section.id }}" data-section="{{ section.id }}">
+          <span class="toc-number">{{ section.num|default("%02d"|format(loop.index)) }}</span>
+          <span>
+            <strong>{{ section.kicker_en|default(section.title_en|default("Section")) }}</strong>
+            <small>{{ section.kicker_ja|default(section.title_ja|default("")) }}</small>
+          </span>
+        </a>
+        {% endfor %}
+      </nav>
+      <div class="sidebar-brand">
+        <img src="{{ url_for('static', filename='img/softbank-logo.svg') }}" alt="SoftBank">
+        <span>SoftBank</span>
+      </div>
+    </aside>
+
+    <main class="main-column">
+      <section class="hero" aria-labelledby="report-title">
+        <p class="kicker">DEVIN WORKSHOP / CODE MIGRATION</p>
+        <div class="hero-title bilingual-heading">
+          <h1 id="report-title">{{ content.meta.title_en|default("Onboarding report") }}</h1>
+          <h2 lang="ja">{{ content.meta.title_ja|default("") }}</h2>
+        </div>
+        <div class="hero-copy bilingual-row">
+          <div class="language-cell en-cell">
+            <p>{{ content.meta.subtitle_en|default("") }}</p>
+            <span class="audience">{{ content.meta.audience_en|default("") }}</span>
+          </div>
+          <div class="language-cell ja-cell" lang="ja">
+            <p>{{ content.meta.subtitle_ja|default("") }}</p>
+            <span class="audience">{{ content.meta.audience_ja|default("") }}</span>
+          </div>
+        </div>
+        <div class="repo-meta">
+          <span>{{ content.meta.repo|default("") }}</span>
+          <span>{{ content.meta.generated|default("") }}</span>
+        </div>
+      </section>
+
+      {% for section in content.sections|default([]) %}
+      <section class="report-section" id="{{ section.id }}" data-section-id="{{ section.id }}">
+        <div class="section-heading">
+          <div>
+            <p class="kicker">{{ section.kicker_en|default("SECTION") }} <span>/ {{ section.num|default("%02d"|format(loop.index)) }}</span></p>
+            <h2>{{ section.title_en|default("") }}</h2>
+          </div>
+          <div lang="ja">
+            <p class="kicker">{{ section.kicker_ja|default("") }}</p>
+            <h3>{{ section.title_ja|default("") }}</h3>
+          </div>
+        </div>
+        {% if section.lede_en or section.lede_ja %}
+        <div class="section-lede bilingual-row">
+          <p class="language-cell en-cell">{{ section.lede_en|default("") }}</p>
+          <p class="language-cell ja-cell" lang="ja">{{ section.lede_ja|default("") }}</p>
+        </div>
+        {% endif %}
+
+        <div class="blocks">
+        {% for block in section.blocks|default([]) %}
+          {% set type = block.type|default("") %}
+          {% if type == "prose" %}
+          <div class="bilingual-row block-row prose-row">
+            <div class="language-cell en-cell">
+              {% for paragraph in block.en|default([]) %}<p>{{ paragraph|inline }}</p>{% endfor %}
+            </div>
+            <div class="language-cell ja-cell" lang="ja">
+              {% for paragraph in block.ja|default([]) %}<p>{{ paragraph|inline }}</p>{% endfor %}
+            </div>
+          </div>
+          {% elif type == "steps" %}
+            {% for item in block["items"]|default([]) %}
+            <div class="bilingual-row block-row step-row">
+              <div class="language-cell en-cell step-card">
+                <span class="step-index">{{ "%02d"|format(loop.index) }}</span>
+                <div><strong>{{ item.label_en|default("") }}</strong><p>{{ item.en|default("")|inline }}</p></div>
+              </div>
+              <div class="language-cell ja-cell step-card" lang="ja">
+                <span class="step-index">{{ "%02d"|format(loop.index) }}</span>
+                <div><strong>{{ item.label_ja|default("") }}</strong><p>{{ item.ja|default("")|inline }}</p></div>
+              </div>
+            </div>
+            {% endfor %}
+          {% elif type == "bullets" %}
+          <div class="bilingual-row block-row bullets-row">
+            <div class="language-cell en-cell"><ul>{% for item in block.en|default([]) %}<li>{{ item|inline }}</li>{% endfor %}</ul></div>
+            <div class="language-cell ja-cell" lang="ja"><ul>{% for item in block.ja|default([]) %}<li>{{ item|inline }}</li>{% endfor %}</ul></div>
+          </div>
+          {% elif type == "callout" %}
+          <div class="bilingual-row block-row callout-row tone-{{ block.tone|default('note') }}">
+            <div class="language-cell en-cell"><p>{{ block.en|default("")|inline }}</p></div>
+            <div class="language-cell ja-cell" lang="ja"><p>{{ block.ja|default("")|inline }}</p></div>
+          </div>
+          {% elif type == "table" %}
+          <div class="shared-block table-block">
+            <div class="table-wrap">
+              <table>
+                <caption class="sr-only">{{ block.caption_en|default("") }} / {{ block.caption_ja|default("") }}</caption>
+                <thead>
+                  <tr>{% for column in block.columns_en|default([]) %}<th>{{ column|inline }}</th>{% endfor %}</tr>
+                  <tr class="ja-header" lang="ja">{% for column in block.columns_ja|default([]) %}<th>{{ column|inline }}</th>{% endfor %}</tr>
+                </thead>
+                <tbody>{% for row in block.rows|default([]) %}<tr>{% for cell in row %}<td>{{ cell|inline }}</td>{% endfor %}</tr>{% endfor %}</tbody>
+              </table>
+            </div>
+            <div class="shared-captions"><span>{{ block.caption_en|default("") }}</span><span lang="ja">{{ block.caption_ja|default("") }}</span></div>
+          </div>
+          {% elif type == "mermaid" %}
+          <div class="shared-block visual-block mermaid-block">
+            <div class="diagram-toolbar"><span class="block-label">DIAGRAM</span><button class="source-toggle" type="button">Show source</button></div>
+            <div class="mermaid-diagram" data-source="{{ block.code|default("")|e }}">{{ block.code|default("") }}</div>
+            <pre class="source-code" hidden>{{ block.code|default("") }}</pre>
+            <div class="shared-captions"><span>{{ block.caption_en|default("") }}</span><span lang="ja">{{ block.caption_ja|default("") }}</span></div>
+          </div>
+          {% elif type == "code" %}
+          <div class="shared-block code-block">
+            <div class="diagram-toolbar"><span class="block-label">{{ block.lang|default("CODE")|upper }}</span></div>
+            <pre><code>{{ block.code|default("") }}</code></pre>
+            <div class="shared-captions"><span>{{ block.caption_en|default("") }}</span><span lang="ja">{{ block.caption_ja|default("") }}</span></div>
+          </div>
+          {% elif type == "links" %}
+          <div class="shared-block links-block">
+            <div class="link-grid">
+              {% for item in block["items"]|default([]) %}
+              <a class="link-card" href="{{ item.href|default('#')|safe_href }}" target="_blank" rel="noreferrer">
+                <div class="link-card-title"><span>{{ item.label_en|default("") }}</span><span lang="ja">{{ item.label_ja|default("") }}</span><b aria-hidden="true">↗</b></div>
+                <span class="link-url">{{ item.href|default("") }}</span>
+                <div class="link-notes"><span>{{ item.note_en|default("") }}</span><span lang="ja">{{ item.note_ja|default("") }}</span></div>
+              </a>
+              {% endfor %}
+            </div>
+          </div>
+          {% elif type == "video" %}
+          <div class="shared-block video-block">
+            {% if block.src %}
+            <video controls{% if block.poster %} poster="{{ block.poster }}"{% endif %}><source src="{{ block.src }}"></video>
+            {% elif block.poster %}<img class="video-poster" src="{{ block.poster }}" alt="{{ block.caption_en|default('Video poster') }}">{% endif %}
+            <a class="link-card video-link" href="{{ block.href|default('#')|safe_href }}" target="_blank" rel="noreferrer">
+              <div class="link-card-title"><span>Open in Devin</span><span lang="ja">Devin で開く</span><b aria-hidden="true">↗</b></div>
+              <span class="link-url">{{ block.href|default("") }}</span>
+            </a>
+            <div class="shared-captions"><span>{{ block.caption_en|default("") }}</span><span lang="ja">{{ block.caption_ja|default("") }}</span></div>
+          </div>
+          {% endif %}
+        {% endfor %}
+        </div>
+      </section>
+      {% endfor %}
+
+      <footer class="report-footer bilingual-row">
+        <span class="language-cell en-cell">{{ content.meta.footer_en|default("") }}</span>
+        <span class="language-cell ja-cell" lang="ja">{{ content.meta.footer_ja|default("") }}</span>
+      </footer>
+    </main>
+  </div>
+  <script src="{{ url_for('static', filename='vendor/mermaid.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

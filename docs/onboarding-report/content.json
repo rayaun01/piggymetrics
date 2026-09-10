@@ -1,0 +1,592 @@
+{
+  "meta": {
+    "title_en": "Workshop for Code Migration / Upgrade",
+    "title_ja": "コード移行・アップグレード ワークショップ",
+    "subtitle_en": "Demo repository: PiggyMetrics",
+    "subtitle_ja": "デモリポジトリ: PiggyMetrics",
+    "audience_en": "For engineers onboarding to Devin. Each section pairs the workflow with the exact artifact it produced in this demo, so you can reproduce the loop on your own repository.",
+    "audience_ja": "Devin を導入するエンジニア向けの資料です。各セクションでは、ワークフローとこのデモで実際に生成された成果物を並べて示します。同じループを自分のリポジトリで再現できます。",
+    "repo": "rayaun01/piggymetrics",
+    "generated": "2026-09-10",
+    "footer_en": "Built from the live demo state of rayaun01/piggymetrics: skills, sessions, review, code scan, and automations as of 2026-09-10. Links open in Devin and require a Devin login.",
+    "footer_ja": "本資料は 2026-09-10 時点の rayaun01/piggymetrics のデモ状態 (スキル・セッション・レビュー・コードスキャン・オートメーション) を基に作成しています。リンク先は Devin であり、Devin へのログインが必要です。"
+  },
+  "sections": [
+    {
+      "id": "approach",
+      "num": "01",
+      "kicker_en": "Migration / modernization approach",
+      "kicker_ja": "移行・モダナイゼーションの進め方",
+      "title_en": "Document, uplift, implement, test",
+      "title_ja": "文書化 → 引き上げ → 実装 → テスト",
+      "lede_en": "The demo does not ask Devin to \"upgrade the app\". It runs four gated phases, each defined by a skill file committed to the repository, and each ending in an artifact a human reviews before the next phase starts.",
+      "lede_ja": "このデモでは Devin に「アプリをアップグレードして」と依頼しません。リポジトリにコミットされたスキルファイルで定義された 4 つのフェーズをゲート付きで進め、各フェーズは人間がレビューする成果物で終わります。",
+      "blocks": [
+        {
+          "type": "prose",
+          "en": [
+            "The skills live in `.agents/skills/` in the demo repository, so the method travels with the code and every session — yours, mine, a delegated one — executes the same gates instead of improvising.",
+            "The rule that makes this work: a phase may not start until the previous phase's artifact exists and is cited. Discovery cites the code, the plan cites discovery, the implementation cites the plan, and the proof cites a recorded baseline."
+          ],
+          "ja": [
+            "スキルはデモリポジトリの `.agents/skills/` に置かれています。手順がコードとともに移動するため、どのセッション (自分・Devin・委任先) でも同じゲートを実行し、その場の判断に流れません。",
+            "成立の条件はひとつです。前フェーズの成果物が存在し、引用されるまで次のフェーズは始まりません。調査はコードを、計画は調査を、実装は計画を、証明は記録済みベースラインを引用します。"
+          ]
+        },
+        {
+          "type": "steps",
+          "items": [
+            {
+              "label_en": "Document",
+              "label_ja": "文書化",
+              "en": "`modernization-preflight` proves scope, toolchains, run tiers and analysis coverage, and ends in exactly one verdict: Ready, Ready-with-gaps, or Not-ready. `modernization-assess-map` then extends four fixed as-is artifacts (topology, API contracts, data model, dependency/EOL register) instead of generating fresh documents, and labels every fact as declared, resolved, observed, inferred or open.",
+              "ja": "`modernization-preflight` がスコープ・ツールチェーン・実行ティア・解析カバレッジを検証し、Ready / Ready-with-gaps / Not-ready のいずれか 1 つの判定で終わります。続く `modernization-assess-map` は新規文書を作らず、既存の 4 つの as-is 成果物 (トポロジ・API 契約・データモデル・依存関係と EOL 台帳) を拡張し、各事実を declared / resolved / observed / inferred / open に分類します。"
+            },
+            {
+              "label_en": "Uplift (plan)",
+              "label_ja": "引き上げ (計画)",
+              "en": "`modernization-brief` turns discovery into an approved plan: objective, target architecture, a forced stage ladder, behaviour walkthroughs, a behaviour contract, open questions, and a recorded human approval block. Every target change must cite the register fact that forces it — \"nice to have\" is not a reason.",
+              "ja": "`modernization-brief` が調査結果を承認済み計画に変換します。目的・目標アーキテクチャ・強制されたステージ順序・振る舞いのウォークスルー・振る舞い契約・未解決の論点・人間の承認記録を含みます。目標とする変更には、それを強制する台帳上の事実の引用が必須で、「あると良い」は理由になりません。"
+            },
+            {
+              "label_en": "Implement",
+              "label_ja": "実装",
+              "en": "`modernization-uplift` executes one stage per branch, per tag, per reviewable PR. It writes `BASELINE.md` before touching source, migrates the mandatory pilot (`account-service`) by hand, writes a fan-out playbook from what that pilot taught, and only then delegates the remaining modules — one agent per module, never per file.",
+              "ja": "`modernization-uplift` が 1 ステージ = 1 ブランチ = 1 タグ = 1 レビュー可能な PR で実行します。ソース変更前に `BASELINE.md` を作成し、必須パイロットである `account-service` を手作業で移行し、そこで得た知見を fan-out プレイブックに書き出したうえで、残りのモジュールを委任します (エージェントはファイル単位ではなくモジュール単位)。"
+            },
+            {
+              "label_en": "Test",
+              "label_ja": "テスト",
+              "en": "Proof is two oracles and nothing else: the T0 test suite (59 tests default, 61 with `-Pfull`) and a recorded T1 HTTP wire capture compared as text. Results are compared, not exit codes — an old failing test that starts passing is a behaviour change to adjudicate, and an unexplained difference blocks the stage.",
+              "ja": "証明はこの 2 つのオラクルのみです。T0 テストスイート (既定 59 件、`-Pfull` で 61 件) と、記録済み T1 HTTP ワイヤ出力のテキスト比較です。比較対象は終了コードではなく結果です。失敗していたテストが通るようになった場合も判断が必要な振る舞い変化であり、説明できない差分はステージを停止させます。"
+            }
+          ]
+        },
+        {
+          "type": "table",
+          "caption_en": "The skill files that define the method (all committed in the demo repository)",
+          "caption_ja": "手順を定義するスキルファイル (すべてデモリポジトリにコミット済み)",
+          "columns_en": ["Skill file", "Owns", "Hard gate it enforces"],
+          "columns_ja": ["スキルファイル", "担当範囲", "強制されるゲート"],
+          "rows": [
+            ["`.agents/skills/modernization-preflight/SKILL.md`", "Readiness record", "Distinguishes `present`, `runnable-here` and `actually-ran`; one explicit verdict"],
+            ["`.agents/skills/modernization-assess-map/SKILL.md`", "Discovery", "Extends the four named as-is artifacts, with evidence citations"],
+            ["`.agents/skills/modernization-brief/SKILL.md`", "Approved plan", "No stage may start without the recorded approval block"],
+            ["`.agents/skills/modernization-uplift/SKILL.md`", "Execution", "Baseline before source edits; pilot before fan-out; `UPLIFT-NOTES.md` at the end"],
+            ["`.agents/skills/modernization-status/SKILL.md`", "Read-only status", "Stage inventory, git freshness, secret hygiene, one next action"],
+            ["`.agents/skills/testing-piggymetrics-demo/SKILL.md`", "Runtime testing", "Real browser evidence; `curl` or DOM inspection alone is not UI proof"]
+          ]
+        },
+        {
+          "type": "table",
+          "caption_en": "The forced stage ladder from the approved brief — stages are never combined",
+          "caption_ja": "承認済みブリーフの強制ステージ順序 — ステージの統合は行いません",
+          "columns_en": ["Stage", "What moves", "Why it must be here", "State"],
+          "columns_ja": ["ステージ", "対象", "この位置に置く理由", "状態"],
+          "rows": [
+            ["0 · `stage-0-baseline`", "Harness and frozen baseline", "The baseline must be recoverable and citable", "Done (`6d42cc7`)"],
+            ["1 · `stage-1-test-infrastructure`", "JUnit 5, JaCoCo, flapdoodle, test runner", "JaCoCo 0.7.6 fails before any test runs — a prerequisite, not a trailing task", "In review (PR #13)"],
+            ["1b · `stage-1b-security-baseline`", "Committed credentials, published ports, unauthenticated Eureka, PII logging", "3 open criticals are reachable today and carry no framework coupling", "Approved, queued"],
+            ["2 · `stage-2-boot-23-hoxton`", "Spring Boot 2.3.12 + Spring Cloud Hoxton.SR12", "Last generation where old Netflix modules and the next Boot generation coexist", "Started"],
+            ["3 · `stage-3-netflix-oauth`", "Zuul, Hystrix, Ribbon, Turbine, OAuth2 retirement", "Those artifacts are not built in Spring Cloud 2020.0+", "Planned"],
+            ["4 · `stage-4-boot-27-jdk17`", "Boot 2.7, Spring Cloud 2021.0, JDK 17", "Boot 2.3 supports only through Java 15; 2.7 is the bridge", "Planned"],
+            ["5 · `stage-5-boot3-jakarta`", "Boot 3, Spring Cloud 2022.0+, `javax` → `jakarta`", "Boot 3 requires Java 17 and removes the `javax` APIs", "Planned"]
+          ]
+        },
+        {
+          "type": "callout",
+          "tone": "note",
+          "en": "Takeaway for your own repository: the leverage is not the prompt, it is the committed skill file. Encode your gates once, and every future session inherits them — including the ones you delegate.",
+          "ja": "自分のリポジトリへの示唆: 効果を生むのはプロンプトではなく、コミットされたスキルファイルです。ゲートを一度定義すれば、以降のすべてのセッション (委任したものを含む) がそれを継承します。"
+        }
+      ]
+    },
+    {
+      "id": "ask-wiki",
+      "num": "02",
+      "kicker_en": "Ask Devin and Deep Wiki",
+      "kicker_ja": "Ask Devin と Deep Wiki",
+      "title_en": "Understand the system before you change it",
+      "title_ja": "変更の前にシステムを理解する",
+      "lede_en": "Before any migration work, the demo used Ask Devin and Deep Wiki as the reading phase: ask a plain question, get a cited answer, then walk the generated module graph to see what the answer connects to — and finish by turning that understanding into a plan.",
+      "lede_ja": "移行作業の前に、このデモでは Ask Devin と Deep Wiki を「読む」フェーズとして使いました。平易な質問に対して根拠付きの回答を得て、生成されたモジュールグラフで関係を追い、最後にその理解を計画へ変換します。",
+      "blocks": [
+        {
+          "type": "prose",
+          "en": [
+            "Ask Devin answers against an index of the repository, and every claim carries the file it came from. That matters here because the answer becomes an input to a migration plan: an uncited answer cannot be used as a forcing fact.",
+            "Deep Wiki is the same index rendered as a browsable, versioned wiki with generated architecture diagrams — useful for onboarding, and useful as the shared vocabulary a delegated session and a human reviewer both read."
+          ],
+          "ja": [
+            "Ask Devin はリポジトリのインデックスに基づいて回答し、各主張には出典ファイルが付きます。回答が移行計画の入力になるため、これは重要です。出典のない回答は、変更を強制する事実として使えません。",
+            "Deep Wiki は同じインデックスを、生成されたアーキテクチャ図付きの閲覧可能な Wiki として提供します。オンボーディングに有用であり、委任セッションと人間のレビュアーが共有する語彙にもなります。"
+          ]
+        },
+        {
+          "type": "links",
+          "items": [
+            {
+              "label_en": "Ask Devin — \"What are the main Java services?\"",
+              "label_ja": "Ask Devin — 「主要な Java サービスは何か」",
+              "href": "https://rayfan.devinenterprise.com/search/what-are-the-main-java-service_fd9c02d5-8e44-4210-9c8b-7aa87d939b51",
+              "note_en": "The exact query used in the demo. The answer names the seven core services plus the two full-profile modules, each cited to its POM.",
+              "note_ja": "デモで実際に使用したクエリです。回答は 7 つのコアサービスと full プロファイルの 2 モジュールを、それぞれの POM を出典として挙げます。"
+            },
+            {
+              "label_en": "Deep Wiki for the demo repository",
+              "label_ja": "デモリポジトリの Deep Wiki",
+              "href": "https://rayfan.devinenterprise.com/wiki",
+              "note_en": "Eight top-level chapters, from overview and platform services through to the modernization program and the frozen .NET scope.",
+              "note_ja": "概要・プラットフォームサービスからモダナイゼーションプログラム、凍結された .NET 範囲まで、8 章構成です。"
+            }
+          ]
+        },
+        {
+          "type": "mermaid",
+          "caption_en": "Deep Wiki module graph: system topology, with each box mapped to the class that implements it",
+          "caption_ja": "Deep Wiki のモジュールグラフ: システムトポロジ。各ボックスは実装クラスに対応します",
+          "code": "flowchart TD\n    subgraph Gateway[\"gateway\"]\n        GatewayApp[\"GatewayApplication.java\"]\n    end\n    subgraph Registry[\"registry\"]\n        RegistryApp[\"EurekaServerApplication.java\"]\n    end\n    subgraph Config[\"config\"]\n        ConfigApp[\"ConfigApplication.java\"]\n    end\n    subgraph Auth[\"auth-service\"]\n        AuthApp[\"AuthApplication.java\"]\n        AuthCtrl[\"UserController.java\"]\n    end\n    subgraph Account[\"account-service\"]\n        AccApp[\"AccountApplication.java\"]\n        AccCtrl[\"AccountController.java\"]\n    end\n    subgraph Stats[\"statistics-service\"]\n        StatsApp[\"StatisticsApplication.java\"]\n        StatsCtrl[\"StatisticsController.java\"]\n    end\n    subgraph Notif[\"notification-service\"]\n        NotifApp[\"NotificationApplication.java\"]\n    end\n\n    Gateway -->|\"/uaa/**\"| Auth\n    Gateway -->|\"/accounts/**\"| Account\n    Gateway -->|\"/statistics/**\"| Stats\n    Gateway -->|\"/notifications/**\"| Notif\n    Auth --- Registry\n    Account --- Registry\n    Stats --- Registry\n    Notif --- Registry"
+        },
+        {
+          "type": "mermaid",
+          "caption_en": "Deep Wiki module graph: the Maven reactor — nine units, flat, with two behind the `full` profile",
+          "caption_ja": "Deep Wiki のモジュールグラフ: Maven リアクタ — 9 ユニットのフラット構成、うち 2 つは `full` プロファイル配下",
+          "code": "flowchart TD\n    Parent[\"piggymetrics (pom.xml)\"] --> Config[\"config\"]\n    Parent --> Registry[\"registry\"]\n    Parent --> Gateway[\"gateway\"]\n    Parent --> Auth[\"auth-service\"]\n    Parent --> Account[\"account-service\"]\n    Parent --> Stats[\"statistics-service\"]\n    Parent --> Notif[\"notification-service\"]\n    Parent --> Monitoring[\"monitoring [full profile]\"]\n    Parent --> Turbine[\"turbine-stream-service [full profile]\"]"
+        },
+        {
+          "type": "callout",
+          "tone": "note",
+          "en": "Read the second graph carefully: no module POM depends on another, so the reactor is flat. Startup order (`config` → `registry` → services → `gateway`) is a runtime fact, not a build dependency — which is exactly why the migration can fan out per module once the pilot is done.",
+          "ja": "2 つ目のグラフの読み方が重要です。モジュール POM 間の依存はなく、リアクタはフラットです。起動順序 (`config` → `registry` → 各サービス → `gateway`) はランタイム上の事実であり、ビルド依存ではありません。だからこそパイロット完了後にモジュール単位で並列展開できます。"
+          },
+        {
+          "type": "prose",
+          "en": [
+            "Ending with a plan is the point of this phase. The reading above produced three plan-shaping facts: the reactor is flat, so per-module fan-out is safe; `account-service` touches Mongo, HTTP, security, tests and shared config, so it is the honest pilot; and the shared files `pom.xml` and `config/src/main/resources/shared/*.yml` are edited only by the orchestrating session, never by a delegated one.",
+            "Those three facts are what the brief then encodes as gates. The sequence is deliberate: ask → graph → plan, and the plan cites the graph."
+          ],
+          "ja": [
+            "このフェーズの目的は計画に落とすことです。上記の読解から、計画を形づくる 3 つの事実が得られました。リアクタがフラットであるためモジュール単位の並列展開が安全であること、`account-service` が Mongo・HTTP・セキュリティ・テスト・共有設定に触れるため妥当なパイロットであること、そして共有ファイル `pom.xml` と `config/src/main/resources/shared/*.yml` はオーケストレーション側セッションのみが編集し、委任セッションは触れないことです。",
+            "この 3 点がブリーフでゲートとして明文化されます。順序は意図的です。質問 → グラフ → 計画、そして計画はグラフを引用します。"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "handoff",
+      "num": "03",
+      "kicker_en": "Handoff to a session",
+      "kicker_ja": "セッションへのハンドオフ",
+      "title_en": "Docs, PR, and \"test the app\"",
+      "title_ja": "ドキュメント作成・PR 作成・アプリのテスト",
+      "lede_en": "With the plan approved, one stage is handed to a session. Stage 1 shows the three Devin steps you will use on every task: it creates the documentation the stage owes, opens a reviewable PR, and then tests the running application in a real browser.",
+      "lede_ja": "計画の承認後、1 ステージをセッションにハンドオフします。Stage 1 は、あらゆるタスクで使う 3 つのステップを示しています。ステージが負う文書の作成、レビュー可能な PR の作成、そして実際のブラウザで動作中のアプリケーションをテストすることです。",
+      "blocks": [
+        {
+          "type": "links",
+          "items": [
+            {
+              "label_en": "Stage 1 session (the handoff)",
+              "label_ja": "Stage 1 セッション (ハンドオフ先)",
+              "href": "https://rayfan.devinenterprise.com/sessions/eea636cb5baf4b6fbf37466faa44116c",
+              "note_en": "Read the session's own plan and artifacts. The stage was scoped to test infrastructure only, and it says so.",
+              "note_ja": "セッション自身の計画と成果物を参照できます。このステージの範囲はテスト基盤のみで、その旨も明記されています。"
+            }
+          ]
+        },
+        {
+          "type": "steps",
+          "items": [
+            {
+              "label_en": "1 · Documentation creation",
+              "label_ja": "1 · ドキュメント作成",
+              "en": "Before editing source, the session recorded `docs/modernization/BASELINE.md` — the T0 per-module pass/fail table, the T1 wire text with its exact serialized values, and the revision both were captured at. It then wrote `PLAYBOOK.md` (instructions for a delegated engineer with no shared context) and `UPLIFT-NOTES.md` (delta → fix mapping, what was deferred and why). These are not decoration: the next stage reads them as input.",
+              "ja": "ソース編集前に、セッションは `docs/modernization/BASELINE.md` を記録しました。T0 のモジュール別 pass/fail 表、正確なシリアライズ値を含む T1 ワイヤ出力、そして両者を取得したリビジョンです。続いて `PLAYBOOK.md` (前提知識のない委任エンジニア向け手順) と `UPLIFT-NOTES.md` (デルタと修正の対応、保留事項とその理由) を作成しました。これらは飾りではなく、次ステージの入力になります。"
+            },
+            {
+              "label_en": "2 · PR creation",
+              "label_ja": "2 · PR 作成",
+              "en": "One stage, one branch, one immutable tag, one PR: `stage-1-test-infrastructure` → PR #13, with the proof in the body — JUnit 4 → JUnit 5, JaCoCo `0.7.6.201602180812` → `0.8.11`, flapdoodle and json-path pins removed in favour of BOM-managed versions, Surefire `2.22.2`. Spring Boot `2.0.3.RELEASE`, Spring Cloud `Finchley.RELEASE` and the Java 8 baseline are deliberately untouched, because that belongs to a later stage.",
+              "ja": "1 ステージ = 1 ブランチ = 1 不変タグ = 1 PR です。`stage-1-test-infrastructure` から PR #13 を作成し、本文に証跡を記載しました。JUnit 4 → JUnit 5、JaCoCo `0.7.6.201602180812` → `0.8.11`、flapdoodle と json-path の固定バージョンを BOM 管理に置換、Surefire `2.22.2` です。Spring Boot `2.0.3.RELEASE`、Spring Cloud `Finchley.RELEASE`、Java 8 ベースラインは意図的に変更していません。それは後続ステージの範囲です。"
+            },
+            {
+              "label_en": "3 · Test the app",
+              "label_ja": "3 · アプリのテスト",
+              "en": "Then the session booted the real stack — seven bare JVMs, MongoDB and a deterministic rates stub — and drove the UI in a browser as a user would: fresh signup, reminder subscription, saving an account, reload and re-login persistence, currency conversion, finite charts, Eureka registration, smoke checks. The evidence is the recording below, not a summary. `curl` and DOM inspection alone are explicitly not accepted as UI proof.",
+              "ja": "その後、セッションは実際のスタック (7 つの素の JVM、MongoDB、決定論的な為替レートスタブ) を起動し、ユーザーと同じようにブラウザで UI を操作しました。新規サインアップ、リマインダー登録、アカウント保存、リロードと再ログイン後の永続性、通貨換算、チャートの有限値、Eureka 登録、スモークチェックです。証跡は要約ではなく下の録画です。`curl` や DOM 検査のみでは UI の証明として認められません。"
+            }
+          ]
+        },
+        {
+          "type": "video",
+          "caption_en": "Stage 1 runtime regression — the actual session recording. Annotations mark each test and its assertion, and the video slows down around them.",
+          "caption_ja": "Stage 1 ランタイム回帰テスト — 実際のセッション録画です。各テストとアサーションに注釈が付き、その前後で再生が減速します。",
+          "src": "",
+          "href": "https://rayfan.devinenterprise.com/attachments/e02b3422-51d8-4fe5-b511-ed5b77a60f77/stage1-ui-regression-clean.mp4",
+          "poster": ""
+        },
+        {
+          "type": "table",
+          "caption_en": "What the recording proves — and what it deliberately does not",
+          "caption_ja": "録画が証明すること、および意図的に証明していないこと",
+          "columns_en": ["Checked in the browser", "Result"],
+          "columns_ja": ["ブラウザで確認した項目", "結果"],
+          "rows": [
+            ["Fresh signup, then reminder subscription", "Passed"],
+            ["Account saving; reload and re-login persistence", "Passed"],
+            ["Currency conversion; charts render finite values", "Passed"],
+            ["Demo stack and Eureka registration; smoke checks", "Passed"],
+            ["Exact JPY golden-master serialization", "Out of scope for the browser run — proven by the T1 text capture"],
+            ["Actual email delivery", "Out of scope for the browser run — no broker in this tier"]
+          ]
+        },
+        {
+          "type": "callout",
+          "tone": "good",
+          "en": "This is the habit to copy: ask for the artifact, not the claim. \"Tests pass\" is a sentence; a recording of the app being used, plus a test table at a named revision, is evidence.",
+          "ja": "取り入れるべき習慣はこれです。主張ではなく成果物を求めること。「テストは通りました」は文章にすぎません。アプリを操作した録画と、リビジョンを明示したテスト結果表が証跡です。"
+        }
+      ]
+    },
+    {
+      "id": "review",
+      "num": "03A",
+      "kicker_en": "Transition to Devin Review",
+      "kicker_ja": "Devin Review への接続",
+      "title_en": "Reading a PR in three panes",
+      "title_ja": "3 つのペインで PR を読む",
+      "lede_en": "The PR is where a human re-enters the loop. Devin Review reorganizes it into three panes so the reviewer's first question — \"what actually changed, and what should I worry about?\" — is answered before opening a single file.",
+      "lede_ja": "PR は人間がループに戻る場所です。Devin Review は PR を 3 つのペインに再構成し、レビュアーの最初の問い「実際に何が変わり、何を懸念すべきか」に、ファイルを 1 つも開く前に答えます。",
+      "blocks": [
+        {
+          "type": "links",
+          "items": [
+            {
+              "label_en": "Devin Review — PR #13",
+              "label_ja": "Devin Review — PR #13",
+              "href": "https://rayfan.devinenterprise.com/review/rayaun01/piggymetrics/pull/13",
+              "note_en": "Stage 1: test infrastructure — JUnit 5, JaCoCo 0.8.11, BOM-managed flapdoodle/json-path (D-08, D-09, D-10, D-19).",
+              "note_ja": "Stage 1: テスト基盤 — JUnit 5、JaCoCo 0.8.11、BOM 管理の flapdoodle / json-path (D-08, D-09, D-10, D-19)。"
+            }
+          ]
+        },
+        {
+          "type": "steps",
+          "items": [
+            {
+              "label_en": "Left pane — what changed",
+              "label_ja": "左ペイン — 変更点",
+              "en": "The change set, grouped by intent rather than by directory: the POM edits that move the test stack, the test sources migrated from JUnit 4 idioms, and the documentation the stage owes. Start here to check scope: for a stage PR, anything outside the stage's declared scope is itself a review finding.",
+              "ja": "変更セットが、ディレクトリ順ではなく意図別にまとめられます。テストスタックを移す POM の編集、JUnit 4 の書き方から移行したテストソース、そしてステージが負う文書です。まずここでスコープを確認します。ステージ PR では、宣言された範囲外の変更それ自体がレビュー指摘になります。"
+            },
+            {
+              "label_en": "Middle pane — the details",
+              "label_ja": "中央ペイン — 詳細",
+              "en": "The diff with the reasoning attached: which delta from the catalog each edit satisfies, and the proof numbers. Here that is 59 tests in the default reactor and 61 under `-Pfull`, both green, plus the T1 golden master reported byte-identical to the recorded baseline — the claim and its measurement in the same view.",
+              "ja": "差分に根拠が付いた形で表示されます。各編集がカタログのどのデルタを満たすか、そして証明となる数値です。ここでは既定リアクタ 59 テスト、`-Pfull` で 61 テストがいずれも成功し、T1 ゴールデンマスターは記録済みベースラインとバイト単位で一致しています。主張とその計測が同じ画面にあります。"
+            },
+            {
+              "label_en": "Right pane — bugs, flags, vulnerabilities",
+              "label_ja": "右ペイン — バグ・フラグ・脆弱性",
+              "en": "Automated findings ranked by severity. On this PR the review raised five, and the useful thing is that they were not all code bugs: a missing mandatory `UPLIFT-NOTES.md`, the `registry` module still on the JUnit 4 classpath, flapdoodle not yet at the approved 3.x/4.x or Testcontainers target, a baseline-documentation issue, and an `OutputCaptureExtension` item.",
+              "ja": "自動検出された指摘が重大度順に並びます。この PR では 5 件が挙がり、重要なのはすべてがコードのバグではなかった点です。必須の `UPLIFT-NOTES.md` の欠落、`registry` モジュールが JUnit 4 のクラスパスに残っていること、flapdoodle が承認済みの 3.x/4.x または Testcontainers に未到達であること、ベースライン文書の指摘、`OutputCaptureExtension` に関する項目です。"
+            }
+          ]
+        },
+        {
+          "type": "table",
+          "caption_en": "How the five findings were resolved — the distinction that matters is fix now vs. carry forward",
+          "caption_ja": "5 件の指摘の扱い — 重要なのは「今直す」か「次に持ち越す」かの区別です",
+          "columns_en": ["Finding", "Disposition"],
+          "columns_ja": ["指摘", "対応"],
+          "rows": [
+            ["Mandatory `UPLIFT-NOTES.md` missing", "Fixed in the PR (`f6ab45d`)"],
+            ["`registry` still resolving JUnit 4", "Fixed in the PR (`f6ab45d`)"],
+            ["Baseline documentation gaps", "Fixed in the PR"],
+            ["flapdoodle not yet 3.x/4.x or Testcontainers", "Carried forward — reachable only at the stage where the Boot/driver version allows it; recorded as a deferral, not silently dropped"],
+            ["T3 AMQP behaviour unmeasured", "Measured and documented (`67e2e7a`) so the later deletion decision rests on a result"]
+          ]
+        },
+        {
+          "type": "callout",
+          "tone": "warn",
+          "en": "Note what did not happen: the deferred item was not quietly fixed to make the review green. A deferral with a named stage and a cited reason is a valid answer to a finding; an undocumented one is the failure mode this workflow exists to prevent.",
+          "ja": "起きなかったことにも注目してください。レビューを通すために保留項目をこっそり修正することはしていません。対象ステージと理由を明記した保留は、指摘への有効な回答です。記録のない保留こそ、このワークフローが防ごうとしている失敗です。"
+        }
+      ]
+    },
+    {
+      "id": "security",
+      "num": "04",
+      "kicker_en": "From review to security scan",
+      "kicker_ja": "レビューからセキュリティスキャンへ",
+      "title_en": "Chained attacks, and CVEs that only look like many",
+      "title_ja": "連鎖する攻撃と、重複して見える CVE",
+      "lede_en": "Per-PR review sees a diff. A code scan sees the whole repository at once, which is the only way to catch a finding whose severity comes from combining three individually dull facts.",
+      "lede_ja": "PR 単位のレビューが見るのは差分です。コードスキャンはリポジトリ全体を一度に見ます。単体では地味な 3 つの事実が組み合わさって重大化する指摘を捉えられるのは、この方法だけです。",
+      "blocks": [
+        {
+          "type": "links",
+          "items": [
+            {
+              "label_en": "Security scan — critical finding: MongoDB published to host with committed root credentials",
+              "label_ja": "セキュリティスキャン — Critical: MongoDB がホストに公開され、root 認証情報がコミット済み",
+              "href": "https://rayfan.devinenterprise.com/org/rayfan-1/security/abc9de1997d146da80002131c5d569bc?finding=sfind-46e861b0d2f140bf9c7585247567ff25",
+              "note_en": "Opens the scan on the finding used as the worked example below.",
+              "note_ja": "下記の例として用いる指摘を開いた状態でスキャンを表示します。"
+            }
+          ]
+        },
+        {
+          "type": "prose",
+          "en": [
+            "**The profile is the whole setup step.** A scan profile is a threat model in words: what is internet-facing, what must never be, which data is sensitive, and what counts as critical here. This demo's profile — \"Piggymetrics EOL security audit — Java + .NET, egress attack surface\" — names the internet-facing gateway and static content; actuator, Hystrix and Eureka exposure; host-published Docker ports; outbound calls, egress and SSRF; weak TLS and missing allowlists; OAuth2 authn/authz and cross-service trust; MongoDB and RabbitMQ handling; deserialization and template handling; PII in logs; committed credentials; and the end-of-life risk in Java 8, Boot/Cloud, Netflix OSS and .NET Core 2.1.",
+            "It also fixes the triage policy up front, so severity is not argued after the fact: unauthenticated internet-facing surfaces, committed credentials, SSRF or unrestricted egress, and disabled TLS verification are critical or high in this repository. Write that down before the scan, and the results arrive already prioritized for your context."
+          ],
+          "ja": [
+            "**設定作業の本体はプロファイルです。** スキャンプロファイルとは、言葉で書かれた脅威モデルです。何がインターネットに露出しているか、何が絶対に露出してはならないか、どのデータが機微か、そしてこの環境で何を Critical と見なすかを定義します。本デモのプロファイル「Piggymetrics EOL security audit — Java + .NET, egress attack surface」は、インターネットに面したゲートウェイと静的コンテンツ、actuator・Hystrix・Eureka の露出、ホストに公開された Docker ポート、外向き通信・egress・SSRF、脆弱な TLS と許可リストの欠落、OAuth2 の認証認可とサービス間の信頼、MongoDB と RabbitMQ の扱い、デシリアライズとテンプレート処理、ログ中の PII、コミットされた認証情報、そして Java 8・Boot/Cloud・Netflix OSS・.NET Core 2.1 の EOL リスクを対象に挙げています。",
+            "トリアージ方針も事前に固定するため、重大度を後から議論する必要がありません。このリポジトリでは、認証なしでインターネットに面した経路、コミットされた認証情報、SSRF または無制限の egress、TLS 検証の無効化が Critical または High です。スキャン前にこれを明文化しておけば、結果は自分の文脈に沿って優先度付けされた状態で届きます。"
+          ]
+        },
+        {
+          "type": "table",
+          "caption_en": "Scan result: 53 findings, already triaged against the profile",
+          "caption_ja": "スキャン結果: 53 件の指摘。プロファイルに沿ってトリアージ済み",
+          "columns_en": ["Severity", "Open", "Dismissed"],
+          "columns_ja": ["重大度", "オープン", "却下"],
+          "rows": [
+            ["Critical", "3", "0"],
+            ["High", "6", "0"],
+            ["Medium", "5", "3"],
+            ["Low", "21", "15"]
+          ]
+        },
+        {
+          "type": "prose",
+          "en": [
+            "**Chained attacks.** A finding is reported as a path, not a property. Three facts that each pass a checklist — a port mapping in Compose, a password in a committed `.env`, a database with root auth — compose into one critical finding, and the chain is what makes the severity arguable in front of an engineer."
+          ],
+          "ja": [
+            "**連鎖する攻撃。** 指摘は属性ではなく経路として報告されます。個別にはチェックリストを通過する 3 つの事実 (Compose のポートマッピング、コミットされた `.env` のパスワード、root 認証のデータベース) が合成され、1 件の Critical になります。エンジニアに対して重大度を説明できるのは、この連鎖があるからです。"
+          ]
+        },
+        {
+          "type": "code",
+          "caption_en": "The reported chain for `sfind-46e861b0…` — critical, open. Location: `docker-compose.core.yml`, host port `27017:27017`, plus `MONGODB_PASSWORD` in a committed `.env`.",
+          "caption_ja": "`sfind-46e861b0…` の報告された連鎖 (Critical / オープン)。該当箇所は `docker-compose.core.yml` のホストポート `27017:27017` と、コミット済み `.env` の `MONGODB_PASSWORD` です。",
+          "lang": "text",
+          "code": "attacker with network reach to host:27017\n  → known committed password\n  → MongoDB root authentication\n  → full read/write access to all PiggyMetrics databases\n     (accounts, auth, statistics, notifications)"
+        },
+        {
+          "type": "table",
+          "caption_en": "Other chains from the same scan — each one is only critical because of the link before it",
+          "caption_ja": "同一スキャン内の他の連鎖 — いずれも直前のリンクがあって初めて重大になります",
+          "columns_en": ["Chain", "Where it ends up"],
+          "columns_ja": ["連鎖", "帰結"],
+          "rows": [
+            ["Committed default credentials → OAuth2 client secrets, MongoDB, config-server password", "One committed file is the key to three trust boundaries"],
+            ["Shared/default OAuth2 client secret + `NoOpPasswordEncoder` → mint a `server`-scoped token", "Attacker-issued token that the services accept"],
+            ["`server`-scoped token → BOLA/IDOR against any account", "Read or write another tenant's data"],
+            ["Coarse `server` scope → cross-tenant statistics read/write", "Scope-only authorization is not object authorization"],
+            ["Unauthenticated Eureka → topology disclosure + rogue service registration", "Traffic redirected to an attacker-registered instance"],
+            ["Unauthenticated Hystrix dashboard proxy → SSRF", "The monitoring tier becomes the pivot"]
+          ]
+        },
+        {
+          "type": "prose",
+          "en": [
+            "**Deduplicated CVEs.** An end-of-life stack generates the same advisory once per module, which is how a scan produces a hundred rows that are really one decision. Here the duplicates are collapsed: the shared root cause is reported once with its affected modules listed, and the per-module repeats are dismissed under the profile's triage rules — which is why 18 of 53 findings are dismissed rather than sitting in a backlog nobody reads.",
+            "The security work then re-enters the migration ladder instead of becoming a parallel project: stage 1b takes the three reachable criticals now (they carry no framework coupling), stage 2 asserts CVE-2020-5412 closure, stage 3 must replace scope-only authorization rather than port `hasScope('server')` verbatim, stage 4 moves the EOL base images, and stage 5 re-runs the scan."
+          ],
+          "ja": [
+            "**CVE の重複排除。** EOL のスタックは同じアドバイザリをモジュールごとに生成するため、実質 1 つの判断が数百行の指摘になりがちです。ここでは重複がまとめられています。共通の根本原因を影響モジュール一覧付きで 1 件として報告し、モジュール別の繰り返しはプロファイルのトリアージ規則に従って却下されます。53 件のうち 18 件が却下されているのはこのためで、誰も読まないバックログにはなりません。",
+            "その後、セキュリティ対応は並行プロジェクトにはせず、移行ラダーに戻します。到達可能な 3 件の Critical は Stage 1b で即対応し (フレームワーク依存がないため)、Stage 2 で CVE-2020-5412 の解消を確認、Stage 3 ではスコープのみの認可を `hasScope('server')` のまま移植せず置き換え、Stage 4 で EOL ベースイメージを更新、Stage 5 でスキャンを再実行します。"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "automations",
+      "num": "05",
+      "kicker_en": "Devin Automations",
+      "kicker_ja": "Devin Automations",
+      "title_en": "An incoming issue triages itself",
+      "title_ja": "受け付けた Issue が自動でトリアージされる",
+      "lede_en": "Everything so far was started by a human. Automations remove that step for recurring work: an issue arrives, a trigger matches, and a session starts with a prompt you wrote once — same gates, same evidence standard, no one waiting to notice the notification.",
+      "lede_ja": "ここまでの流れは人間が起点でした。Automations は、繰り返し発生する作業からその起点を取り除きます。Issue が到着してトリガーが一致すると、一度書いておいたプロンプトでセッションが開始します。ゲートと証跡の基準は同じで、通知に気づく人を待つ必要はありません。",
+      "blocks": [
+        {
+          "type": "steps",
+          "items": [
+            {
+              "label_en": "1 · Trigger",
+              "label_ja": "1 · トリガー",
+              "en": "The automation \"PiggyMetrics issue triage\" is enabled on GitHub issue events for this repository, and matches an issue opened with a title starting `[Bug]: `, or an issue labelled `bug` or `devin-triage`. Narrow conditions matter more than clever prompts: they are what stops the automation from firing on everything.",
+              "ja": "オートメーション「PiggyMetrics issue triage」は、このリポジトリの GitHub Issue イベントで有効化されています。タイトルが `[Bug]: ` で始まる Issue の作成時、または `bug` / `devin-triage` ラベルの付与時に一致します。巧妙なプロンプトより、条件を狭く保つことが重要です。あらゆる Issue で起動しないための仕組みだからです。"
+            },
+            {
+              "label_en": "2 · Structured intake",
+              "label_ja": "2 · 構造化された受付",
+              "en": "The issue form asks the questions triage always needs: is it UI-facing, which service, how was it running, reproduction, expected vs. actual, and no real credentials. A structured issue is why the session can start work instead of starting a conversation.",
+              "ja": "Issue フォームは、トリアージで常に必要となる項目を尋ねます。UI に関わるか、どのサービスか、どう起動していたか、再現手順、期待結果と実際の結果、そして実際の認証情報を含めないことです。構造化された Issue であるからこそ、セッションは会話ではなく作業から始められます。"
+            },
+            {
+              "label_en": "3 · Prompt with gates",
+              "label_ja": "3 · ゲート付きプロンプト",
+              "en": "The stored prompt is where standards get enforced: reproduce before fixing; invoke the repository's testing skill; use Java 8; run `JAVA_HOME=/usr/lib/jvm/temurin-8-jdk-amd64 mvn -B -fae verify`; browser-test UI issues in the real app; never expose `.env` credentials.",
+              "ja": "保存されたプロンプトが基準を強制します。修正前に再現すること、リポジトリのテストスキルを呼び出すこと、Java 8 を使うこと、`JAVA_HOME=/usr/lib/jvm/temurin-8-jdk-amd64 mvn -B -fae verify` を実行すること、UI の問題は実際のアプリでブラウザ検証すること、`.env` の認証情報を露出させないことです。"
+            },
+            {
+              "label_en": "4 · Output the team expects",
+              "label_ja": "4 · チームが期待する出力",
+              "en": "The session opens a PR on a `devin/<unix-timestamp>-issue-<n>-<slug>` branch, comments on the issue with what it found and how it verified, adds the `triaged` label and removes `needs-triage`. The issue tracker stays the source of truth — the automation writes back into it rather than beside it.",
+              "ja": "セッションは `devin/<unix-timestamp>-issue-<n>-<slug>` ブランチで PR を作成し、判明内容と検証方法を Issue にコメントし、`triaged` ラベルを付与して `needs-triage` を外します。Issue トラッカーが真実の source のまま保たれます。オートメーションはその横ではなく、その中に書き戻します。"
+            }
+          ]
+        },
+        {
+          "type": "links",
+          "items": [
+            {
+              "label_en": "Issue #16 — [Bug]: Stored XSS on the dashboard",
+              "label_ja": "Issue #16 — [Bug]: ダッシュボードの Stored XSS",
+              "href": "https://github.com/rayaun01/piggymetrics/issues/16",
+              "note_en": "Reported as UI-facing, service unknown, with an account item field suspected of rendering without escaping. Labels on arrival: `bug`, `needs-triage`.",
+              "note_ja": "UI に関わる問題、対象サービスは不明、アカウント項目のフィールドがエスケープなしで描画されている疑い、として報告されました。到着時のラベルは `bug` と `needs-triage` です。"
+            },
+            {
+              "label_en": "Triage session for issue #16 — running now",
+              "label_ja": "Issue #16 のトリアージセッション — 実行中",
+              "href": "https://rayfan.devinenterprise.com/sessions/60dc3b21f4f74ae7827e1dcfbf0c9313",
+              "note_en": "Started by the automation, not by a human. Open it to watch the loop live: reproduce in the browser first, then fix, then verify.",
+              "note_ja": "人間ではなくオートメーションが開始したセッションです。開くと、ブラウザで再現 → 修正 → 検証というループを実行中の状態で確認できます。"
+            }
+          ]
+        },
+        {
+          "type": "callout",
+          "tone": "note",
+          "en": "This example is deliberately unfinished. The session above was still working when this report was written, so nothing here claims a fix — watch it rather than read a summary of it. Note also what triage does not do: it never assumes the report is correct, because reproduce-before-fix is a gate in the prompt.",
+          "ja": "この例は意図的に未完了です。本資料の作成時点で上記セッションは作業中であり、ここでは修正の完了を主張しません。要約を読むのではなく、進行中の様子を確認してください。トリアージが行わないことにも注目してください。報告内容を正しいと仮定することはありません。「修正前に再現」がプロンプト上のゲートだからです。"
+        }
+      ]
+    },
+    {
+      "id": "next-stage",
+      "num": "06",
+      "kicker_en": "The next migration step",
+      "kicker_ja": "次の移行ステップ",
+      "title_en": "Stage 2 — and the approach in five rules",
+      "title_ja": "Stage 2 — そして 5 つのルールに要約した進め方",
+      "lede_en": "Stage 2 is now in flight: Spring Boot 2.3.12 with Spring Cloud Hoxton.SR12. It is worth reading as a worked example of how a stage is bounded before it starts.",
+      "lede_ja": "現在 Stage 2 が進行中です。Spring Boot 2.3.12 と Spring Cloud Hoxton.SR12 への更新です。ステージ開始前に範囲をどう限定するかの実例として参照する価値があります。",
+      "blocks": [
+        {
+          "type": "links",
+          "items": [
+            {
+              "label_en": "Stage 2 session — `stage-2-boot-23-hoxton`",
+              "label_ja": "Stage 2 セッション — `stage-2-boot-23-hoxton`",
+              "href": "https://rayfan.devinenterprise.com/sessions/f67c979c3ebf4640bc041fb55d7b35f4",
+              "note_en": "Branched off `stage-1-test-infrastructure`, not `master`, because stage 1 is unmerged and stage 2 depends on its JUnit 5 stack; the PR therefore targets the stage 1 branch.",
+              "note_ja": "`master` ではなく `stage-1-test-infrastructure` から分岐しています。Stage 1 が未マージで、Stage 2 がその JUnit 5 スタックに依存するためです。PR も Stage 1 ブランチを対象にします。"
+            }
+          ]
+        },
+        {
+          "type": "table",
+          "caption_en": "Stage 2 at a glance",
+          "caption_ja": "Stage 2 の概要",
+          "columns_en": ["Field", "Value"],
+          "columns_ja": ["項目", "内容"],
+          "rows": [
+            ["Moves", "Spring Boot `2.0.3.RELEASE` → `2.3.12`, Spring Cloud `Finchley.RELEASE` → `Hoxton.SR12`, MongoDB driver generation, and flapdoodle's driver-coupled half (D-01, D-16, D-23)"],
+            ["Stays", "Java 8, Zuul, Hystrix, Ribbon, OAuth2 — Netflix and OAuth retirement is stage 3, JDK 17 is stage 4"],
+            ["Why here", "Hoxton is the last generation where the old Netflix modules and the next supported Boot generation coexist"],
+            ["Proof", "T0 both profiles, plus the T1 golden master compared as text against the recorded baseline"],
+            ["Must answer", "Open question 4 — does the server-side JavaScript `@Query` in `RecipientRepository` survive the driver/server move? A runtime check, and it blocks this stage"],
+            ["Security exit criterion", "CVE-2020-5412 closure asserted at this stage"]
+          ]
+        },
+        {
+          "type": "bullets",
+          "en": [
+            "**One stage, one branch, one tag, one PR.** Stages are never combined, and a proposed reordering must cite the fact that forces it.",
+            "**Every change cites a forcing fact.** The dependency/EOL register is the authority; \"newer is better\" never appears as a reason.",
+            "**Record the baseline before editing.** The oracle must exist, at a single named revision, before the first source change.",
+            "**Pilot one representative module, then fan out.** `account-service` first, by hand, and its surprises become the playbook the delegated modules follow.",
+            "**Compare results, not exit codes.** Intended, regression, or unexplained — and unexplained blocks the stage."
+          ],
+          "ja": [
+            "**1 ステージ = 1 ブランチ = 1 タグ = 1 PR。** ステージは統合せず、順序変更を提案する場合はそれを強制する事実の引用が必要です。",
+            "**すべての変更は強制する事実を引用する。** 依存関係と EOL の台帳が根拠であり、「新しい方が良い」は理由になりません。",
+            "**編集前にベースラインを記録する。** 最初のソース変更より前に、単一の明示されたリビジョンでオラクルが存在していなければなりません。",
+            "**代表モジュールを 1 つパイロットし、その後に展開する。** まず `account-service` を手作業で行い、そこで得た想定外がプレイブックとなり、委任モジュールがそれに従います。",
+            "**終了コードではなく結果を比較する。** 意図した変化・退行・説明不能のいずれかに分類し、説明不能はステージを停止させます。"
+          ]
+        },
+        {
+          "type": "callout",
+          "tone": "good",
+          "en": "The reason this scales is unglamorous: each stage is small enough to review in one sitting, and its proof is mechanical. Ambition lives in the ladder, not in any single PR.",
+          "ja": "この方式が拡張できる理由は地味です。各ステージは一度のレビューで読み切れる大きさで、その証明は機械的です。野心はラダー全体に置き、個々の PR には置きません。"
+        }
+      ]
+    },
+    {
+      "id": "appendix-blueprint",
+      "num": "A",
+      "kicker_en": "Appendix",
+      "kicker_ja": "付録",
+      "title_en": "Tuning the blueprint so Devin runs faster",
+      "title_ja": "Devin を高速に動かすためのブループリント改善",
+      "lede_en": "A blueprint is the YAML that builds the machine every session boots from. It is the highest-leverage file in a Devin setup and the easiest to leave half-configured: a slow dependency mirror does not fail a build, it just makes every session slower, forever.",
+      "lede_ja": "ブループリントは、各セッションが起動するマシンを構築する YAML です。Devin の設定で最も効果が大きく、同時に中途半端な状態を放置しやすいファイルでもあります。依存関係ミラーが遅いだけならビルドは失敗せず、以後すべてのセッションが静かに遅くなり続けます。",
+      "blocks": [
+        {
+          "type": "prose",
+          "en": [
+            "This demo's blueprint does the hard part correctly: it installs Temurin 8 and pins `JAVA_HOME` (the root POM enforces `[1.8,1.9)`, so no module builds on any other JDK), installs Maven, writes a `central` mirror because Maven Central returns HTTP 429 from this network, and installs MongoDB 3.2.2 — the last release shipping both `mongod` and the legacy `mongo` shell that the demo scripts need. Its `knowledge` entries give every new session the exact test, startup and smoke commands, so no session has to rediscover them.",
+            "The cost is concentrated in one line. The provisioned `aliyun-central` mirror served an OpenRewrite dependency closure at roughly 1–2 kB/s during preflight; the goal was still downloading POMs when the time budget expired, which is why no OpenRewrite finding may enter the delta catalog and mechanical deltas are applied by hand. A slow mirror did not just cost minutes — it removed a tool from the method."
+          ],
+          "ja": [
+            "本デモのブループリントは、難しい部分を正しく処理しています。Temurin 8 をインストールして `JAVA_HOME` を固定し (ルート POM が `[1.8,1.9)` を強制するため、他の JDK ではどのモジュールもビルドできません)、Maven を導入し、この環境から Maven Central が HTTP 429 を返すため `central` ミラーを設定し、MongoDB 3.2.2 (デモスクリプトが必要とする `mongod` と旧 `mongo` シェルの両方を含む最後のリリース) を導入します。`knowledge` 項目により、新規セッションはテスト・起動・スモークの正確なコマンドを最初から把握でき、再発見の手間が不要です。",
+            "一方でコストは 1 点に集中しています。プロビジョニングされた `aliyun-central` ミラーは、preflight 時に OpenRewrite の依存クロージャを約 1〜2 kB/s で配信し、時間予算の終了時点でまだ POM をダウンロード中でした。そのため OpenRewrite の検出結果はデルタカタログに入れられず、機械的なデルタは手作業で適用しています。遅いミラーは数分を失わせただけでなく、手法からツールを 1 つ取り除きました。"
+          ]
+        },
+        {
+          "type": "table",
+          "caption_en": "Levers, and what each one buys — currently under evaluation in a dedicated session",
+          "caption_ja": "改善の手段と効果 — 現在、専用セッションで評価中",
+          "columns_en": ["Lever", "Effect", "Risk to weigh"],
+          "columns_ja": ["手段", "効果", "検討すべきリスク"],
+          "rows": [
+            ["Faster or additional mirror; fall back to Central when the mirror is slow", "Restores throughput; makes an OpenRewrite dry-run reachable again", "Mirror choice is network-dependent — measure from the machine, do not assume"],
+            ["A `maintenance` block that warms the dependency cache (e.g. `dependency:go-offline`)", "Moves the download out of every session and into the snapshot build", "Must stay incremental — never wipe and re-resolve"],
+            ["Parallel reactor builds (`mvn -T`)", "Wall-clock win on a nine-unit flat reactor", "Interleaved output; confirm plugin thread-safety first"],
+            ["Pin the analysis and lint tooling the workflow actually needs", "`present` becomes `actually-ran`, so tool findings can be cited as proof", "Only pin what a skill really invokes"],
+            ["Record verified commands in `knowledge`", "Sessions stop rediscovering setup; already done well here", "Keep them true — a stale command is worse than none"]
+          ]
+        },
+        {
+          "type": "links",
+          "items": [
+            {
+              "label_en": "Environment and build-performance session",
+              "label_ja": "環境・ビルド性能のセッション",
+              "href": "https://rayfan.devinenterprise.com/sessions/b469a8d9a1854412872845c97fd1cb2a",
+              "note_en": "Investigating the slow `aliyun-central` mirror and build times, and proposing tactical, safe blueprint changes. Recommendations land as a reviewable blueprint suggestion, not a silent edit.",
+              "note_ja": "低速な `aliyun-central` ミラーとビルド時間を調査し、安全で実用的なブループリント変更を提案するセッションです。提案はサイレントな編集ではなく、レビュー可能なブループリント提案として届きます。"
+            }
+          ]
+        },
+        {
+          "type": "callout",
+          "tone": "warn",
+          "en": "Only put commands in a blueprint that you have actually run on the machine. They execute unattended in later snapshot builds, so an unverified command fails silently — and a blueprint nobody trusts gets bypassed by hand in every session, which is the whole benefit gone.",
+          "ja": "ブループリントには、実際にそのマシンで実行したコマンドのみを記載してください。以降のスナップショット構築では無人で実行されるため、未検証のコマンドは静かに失敗します。信頼されないブループリントは毎回手作業で回避され、利点は完全に失われます。"
+        }
+      ]
+    }
+  ]
+}
