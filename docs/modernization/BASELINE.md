@@ -118,11 +118,45 @@ post-edit tables, and the §3 wire text versus the post-edit capture, compared
 as text. The dual-run gate becomes meaningful in Stage 4, where the JDK
 changes.
 
-## 5. T3 (AMQP / D-07) — not run for this stage
+## 5. T3 (AMQP / D-07) — run, and the path works
 
-`docs/modernization/BRIEF.md` §6 lists a T3 AMQP result for D-07 in the
-baseline file. D-07 is a Spring AMQP / RabbitMQ delta owned by a later stage;
-Stage 1 touches only test-scope build inputs and no messaging code, no
-`docker-compose*.yml`, and no shared configuration, so a T3 Compose run has no
-Stage 1 oracle value and is deliberately deferred to the stage that carries
-D-07. This is a scope deferral, recorded here rather than silently skipped.
+`docs/modernization/BRIEF.md` §5 requires the baseline file to record the T3
+AMQP result for D-07. It was run at the Stage 1 head (`f6ab45d`), on the same
+box, per `docs/RUNBOOK.md` T3:
+
+```bash
+JAVA_HOME=/usr/lib/jvm/temurin-8-jdk-amd64 mvn -B -Pfull package
+docker compose --env-file .env -f docker-compose.yml -f docker-compose.dev.yml build
+docker compose --env-file .env -f docker-compose.yml up -d
+```
+
+All fourteen containers came up (four Mongos, RabbitMQ, config, registry,
+gateway, the four services, `monitoring`, `turbine-stream-service`). Hystrix
+commands were then driven through the gateway: account creation plus repeated
+`PUT /accounts/current` and `GET /statistics/current`, which exercise
+`AuthServiceClient#createUser` and `StatisticsServiceClient#updateStatistics`.
+
+**Result: the D-07 AMQP path is live, not inert.** Measured, end to end:
+
+| Hop | Observation |
+| --- | --- |
+| Publisher → broker | `rabbitmqctl list_exchanges` shows the `springCloudHystrixStream` exchange; `list_bindings` shows it bound to a consumer queue |
+| Broker → Turbine | `turbine-stream-service` log: `declaring queue for inbound: springCloudHystrixStream.anonymous.…, bound to: springCloudHystrixStream`, then `started inbound.springCloudHystrixStream.anonymous.…` |
+| Turbine → aggregation | `GET http://turbine-stream-service:8080/turbine.stream` streams `data:{…"type":"HystrixCommand"…}` frames naming `account-service.AuthServiceClient#createUser(User)`, `account-service.StatisticsServiceClient#updateStatistics(String,Account)`, and the `auth-service` / `statistics-service` thread pools |
+| Turbine → dashboard | `GET http://localhost:9000/proxy.stream?origin=…turbine.stream` on the `monitoring` Hystrix dashboard returned ~244 KB of the same SSE frames |
+
+This matters for the D-07 decision: the register's `05-…:562` note that
+`/hystrix.stream` is 404 in T1 records the absence of a broker in that tier,
+**not** a dead feature. T3 shows working behaviour, so deleting the tier in
+D-07 removes something that functions today, and the deletion must be argued
+as an accepted loss (no GA `turbine-core` exists for Boot 2.7/3) rather than
+as removing dead code.
+
+One defect found while measuring, pre-existing and unrelated to Stage 1:
+`docker-compose.yml:179-180` publishes `8989:8989` for
+`turbine-stream-service`, but the service's Netty server listens on `8080`
+inside the container (`Netty started on port(s): 8080`), so the stream is
+unreachable from the host and `curl localhost:8989/turbine.stream` resets. It
+is reachable on the Compose network, which is how the dashboard consumes it,
+so the tier works; only the host publish is wrong. Left unfixed here — Stage 1
+changes no Compose file — and flagged for the stage that owns D-07.

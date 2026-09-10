@@ -63,7 +63,7 @@ unexplained delta.
 | flapdoodle `3.x`/`4.x` or Testcontainers | `3.x` renames `IMongodConfig` → `MongodConfig` and targets the Mongo `4.x` driver; Boot `2.0.3`'s `EmbeddedMongoAutoConfiguration` cannot drive it, and the driver only moves `3.6.4` → `4.0.6` with D-16. Boot-managed `2.0.3` is the least-behaviour-change option that keeps the four repository tests on Java 8 / Boot 2.0.3 today (`05-…:312`, BRIEF §7 q3) | Stage 2, with D-16 |
 | `guava 19.0` | §3.1 | Stage 3 (Netflix retirement) or the Boot generation that manages Guava |
 | `mockito-junit-jupiter` | Not published until Mockito `2.17`; Boot `2.0.3` manages `2.15.0` and pinning it is out of scope | a later Boot generation |
-| T3 (Compose/AMQP, D-07) | `BRIEF.md` §6 schedules T3 at stage 5 and §4 assigns the AMQP-path measurement to the stage-3 session. Stage 1 touches no messaging code, no `docker-compose*.yml`, and no shared YAML, so a T3 run has no Stage 1 oracle value | stage 3 records the AMQP path result; T3 tier runs at stage 5 |
+| ~~T3 (Compose/AMQP, D-07)~~ | **No longer deferred.** Run at Ray's instruction at the Stage 1 head; the AMQP path is live and the result is recorded in `BASELINE.md` §5 | done here |
 | Boot / Spring Cloud / Java version moves | stage ladder — explicitly forbidden in this stage | Stages 2–5 |
 
 ## 5. Per-unit results
@@ -88,6 +88,18 @@ Per-class counts were compared as well, not only per-module totals: a test that
 silently stops being discovered is the failure mode a JUnit-runner move is most
 exposed to, and it hides inside a matching module total only if two classes
 move in opposite directions. None did.
+
+T3 (AMQP / D-07): run at `f6ab45d`, full result in `BASELINE.md` §5. The
+Hystrix metrics path works end to end under Compose — publishers →
+`springCloudHystrixStream` exchange → `turbine-stream-service` →
+`monitoring`'s dashboard proxy, carrying named `HystrixCommand` frames for
+`AuthServiceClient#createUser` and `StatisticsServiceClient#updateStatistics`.
+D-07 therefore deletes **working** behaviour, not dead code; the deletion has
+to be argued as an accepted loss. Unrelated pre-existing defect found while
+measuring: `docker-compose.yml:179-180` publishes `8989:8989` while the
+service listens on `8080` in-container, so the stream is host-unreachable
+(fine on the Compose network). Not fixed here — Stage 1 changes no Compose
+file.
 
 T1 golden master: the raw wire text captured after the stage is byte-identical
 to `BASELINE.md` §3 (`diff -u` over the raw text, no JSON parsing), including
