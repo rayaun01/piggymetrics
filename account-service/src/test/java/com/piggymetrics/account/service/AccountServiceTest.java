@@ -4,16 +4,17 @@ import com.piggymetrics.account.client.AuthServiceClient;
 import com.piggymetrics.account.client.StatisticsServiceClient;
 import com.piggymetrics.account.domain.*;
 import com.piggymetrics.account.repository.AccountRepository;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 
 import java.math.BigDecimal;
 import java.util.Arrays;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.*;
 import static org.mockito.MockitoAnnotations.initMocks;
 
@@ -31,7 +32,7 @@ public class AccountServiceTest {
 	@Mock
 	private AccountRepository repository;
 
-	@Before
+	@BeforeEach
 	public void setup() {
 		initMocks(this);
 	}
@@ -48,9 +49,9 @@ public class AccountServiceTest {
 		assertEquals(account, found);
 	}
 
-	@Test(expected = IllegalArgumentException.class)
+	@Test
 	public void shouldFailWhenNameIsEmpty() {
-		accountService.findByName("");
+		assertThrows(IllegalArgumentException.class, () -> accountService.findByName(""));
 	}
 
 	@Test
@@ -137,13 +138,13 @@ public class AccountServiceTest {
 		verify(statisticsClient, times(1)).updateStatistics("test", account);
 	}
 
-	@Test(expected = IllegalArgumentException.class)
+	@Test
 	public void shouldFailWhenNoAccountsExistedWithGivenName() {
 		final Account update = new Account();
 		update.setIncomes(Arrays.asList(new Item()));
 		update.setExpenses(Arrays.asList(new Item()));
 
 		when(accountService.findByName("test")).thenReturn(null);
-		accountService.saveChanges("test", update);
+		assertThrows(IllegalArgumentException.class, () -> accountService.saveChanges("test", update));
 	}
 }
