@@ -2,8 +2,8 @@
 
 Named inputs are the module constants below: ``SYSTEM``, source/target
 versions, ``BASELINE_REVISION``, ``REPO``, and the role/path constants. Run
-with ``run_workflow`` using ``script_path`` set to
-``/home/ubuntu/repos/piggymetrics/.agents/workflows/uplift_deltas.py``.
+with ``run_workflow`` using ``script_path`` set to this file's absolute path
+in your checkout.
 
 Adapted from the Apache-2.0 licensed code-modernization plugin,
 ``workflows/uplift-deltas.js``.

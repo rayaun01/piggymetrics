@@ -6,7 +6,7 @@ description: Boot and browser-test the PiggyMetrics bare-JVM migration-demo stac
 # Local stack
 - Work from the current PiggyMetrics checkout; do not assume similarly named sibling directories are the active checkout.
 - Read `docs/RUNBOOK.md` and `scripts/demo/start-local.sh` first. Use JDK 8 for existing baseline jars/builds.
-- If MongoDB is not on PATH, set `MONGO_BIN` to an installed `mongod` with a matching sibling `mongo` shell. In this environment the installed tarball is `/home/ubuntu/repos/piggymetrics-demo-harness/mongodb-linux-x86_64-3.2.2/bin/mongod`.
+- The blueprint provisions MongoDB 3.2.2 on `PATH`; check with `command -v mongod` first. Only if it is absent, set `MONGO_BIN` to an installed `mongod` that has a matching sibling `mongo` shell (the legacy shell is required — the seed scripts use it), and locate it rather than assuming a path from an earlier session.
 - Start with `MONGO_BIN=<absolute binary> scripts/demo/start-local.sh`. Measure readiness using a monotonic timer and retain the script output. A gateway listening socket or root HTTP 200 does not prove routed OAuth/account readiness.
 - Gateway UI is `http://localhost:4000`; Eureka is `http://localhost:8761`. Logs/PIDs live under `.demo-runtime`.
 - Stop with the same `MONGO_BIN` override and `scripts/demo/stop-local.sh`, unless the user requests leaving services running.

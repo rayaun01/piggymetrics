@@ -110,21 +110,26 @@ The interactive topology viewer is deliberately not ported or replaced.
 Four of the six upstream orchestration scripts are not ported, so the
 associated skills fall back to sequential delegation.
 
-## 11. Known repo-state gaps
+## 11. Repo-state notes
 
-The instructions currently outrun the repository; that is a repository defect,
-not a kit assumption:
+The kit's cited paths resolve on `master`. What remains is stated so nobody
+mistakes an intentional gap for an oversight:
 
-- The four `docs/as-is/` artifacts are currently on open PRs against the Stage
-  0 branch; the cited paths resolve after those changes merge. `docs/RUNBOOK.md`
-  is already present on this branch and supplies the runbook facts.
-- No `stage-0-baseline` tag exists yet.
-- `master` is not a usable oracle: it predates the Stage 0 harness, its test
-  suite does not pass, its Mongo image cannot build, and its front end is
-  broken. The Stage 0 tip and its eventual tag are the real frozen baseline.
-- `docs/as-is/` numbering skips `02`.
+- The four `docs/as-is/` artifacts (`01`, `03`, `04`, `05`) are present, and
+  `docs/RUNBOOK.md` supplies the run-tier facts. `docs/as-is/` numbering
+  reserves `02` for the runtime call graph, which is not written yet: it can
+  only be produced against a running stack, so the number is held rather than
+  reused.
+- `stage-0-baseline` is the frozen baseline: an immutable tag, not a branch.
+  Every stage branches from that tag and is diffed against it. `master` moves,
+  so it is never the oracle even though it now carries the Stage 0 harness;
+  history before that harness cannot be one either, because there the test
+  suite fails, the Mongo image will not build, and the front end is broken.
+- The tag predates this kit and the corrections to it. That is deliberate: the
+  baseline freezes application behavior, and method tooling added afterwards
+  must not move the oracle.
 - `docs/modernization/` does not exist yet; the uplift artifacts are its
-  outputs.
+  outputs, created by the skills rather than checked in ahead of them.
 
 ## 12. License pointer
 
