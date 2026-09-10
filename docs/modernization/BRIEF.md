@@ -249,7 +249,10 @@ and when it blocks.
    `seed-local.sh:6`), so removing the committed defaults breaks T1 unless the
    harness generates a secret per run. A generated secret keeps T1
    reproducible; a developer-supplied secret is stricter but makes the golden
-   master environment-dependent. Blocks the proposed stage 1b, not stage 1.
+   master environment-dependent. **Preferred answer recorded** (generated per
+   run, fail closed, env-var-only injection —
+   `docs/modernization/SECURITY-REMEDIATION-PLAN.md` §6.1); awaiting the
+   approver. Blocks the proposed stage 1b, not stage 1.
 10. **Memory headroom under Boot 3 defaults** with `-Xmx200m` /
    `-XX:MaxMetaspaceSize=128m` (`05-…:609-610`, D-21). Measurable only once a
    unit reaches Boot 3; blocks the stage-5 T1 tier if it fails.

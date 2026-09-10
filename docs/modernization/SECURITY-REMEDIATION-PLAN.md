@@ -133,6 +133,45 @@ scope**, so Gate 3 applies: this amendment needs the human approver's decision
 before stage 1b executes. Stage 1 is unaffected and continues.
 
 Open question added to `BRIEF.md` §7: **what replaces the committed `.env` for
-local development?** A generated-per-run secret keeps T1 reproducible; a
-developer-supplied secret is stricter but makes the golden master
-environment-dependent. This blocks stage 1b, not stage 1.
+local development?** This blocks stage 1b, not stage 1.
+
+### 6.1 Recommended answer: generated per run
+
+Recorded as the executing session's preference, still subject to the approver's
+ratification.
+
+The apparent trade-off ("reproducible T1" versus "stricter") mostly dissolves on
+inspection. The golden master is the T1 **response text** — credentials never
+appear in it — and `smoke.sh` already generates the account name per run
+(`wire1788889784`). Generating the password and the three service secrets
+alongside it therefore leaves the oracle bit-identical. The
+developer-supplied variant is the one that makes T1 environment-dependent, and
+it reliably degrades back to someone typing `password`.
+
+Stage 1b therefore:
+
+- removes every `${…:-password}` fallback; `start-local.sh` mints high-entropy
+  values per run and exports them;
+- **fails closed** — an unset secret aborts the run; there is no default;
+- keeps the injection surface **environment-variable-only, with no secrets
+  file**, so a real deployment swaps the provider (Vault / SSM / Kubernetes
+  secret) without an application-code change;
+- adds `.env` to `.gitignore` and treats the present values as permanently
+  compromised — they are in git history, so removal is not rotation.
+
+### 6.2 Consequences of the "eventually real data" trajectory
+
+The current corpus is mock data. Two items change character once it is not:
+
+1. **The `demo` account must stop being an authorization exception.**
+   `#name.equals('demo')` plus `permitAll()` on `/demo` makes one account
+   world-readable — defensible for a sandbox, not for real data. The fix is
+   stage-3 work (`sfind-31cdf4c1`, same annotation as the BOLA fix) and its
+   shape is fixed here: an explicit public endpoint over non-sensitive sample
+   data, never a bypass inside the ownership rule.
+2. **The frozen .NET services become a deployment blocker, not a low finding.**
+   `sfind-391d3acb` (KYC/AML/audit) and `sfind-b77d4137` (fraud detection) are
+   fully unauthenticated APIs, rated against a corpus nobody deploys. Against
+   real data they need their own remediation track before any deployment. They
+   remain outside the Java ladder (`BRIEF.md` §2) and outside this plan's
+   authority to schedule.
