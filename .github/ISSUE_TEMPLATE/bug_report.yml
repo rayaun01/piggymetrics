@@ -1,0 +1,96 @@
+name: Bug report
+description: Report something broken in PiggyMetrics
+title: "[Bug]: "
+labels:
+  - bug
+  - needs-triage
+body:
+  - type: markdown
+    attributes:
+      value: |
+        A Devin triage session picks bug reports up automatically, so concrete reproduction steps and logs matter. Please do not paste real credentials or secrets.
+  - type: dropdown
+    id: ui_facing
+    attributes:
+      label: Is this UI-facing?
+      description: Does the problem show up in the browser UI (gateway on :4000)?
+      options:
+        - Yes - browser/UI
+        - No - backend/API/build
+        - Not sure
+    validations:
+      required: true
+  - type: dropdown
+    id: service
+    attributes:
+      label: Affected service/area
+      multiple: false
+      options:
+        - gateway (UI / routing)
+        - account-service
+        - auth-service
+        - statistics-service
+        - notification-service
+        - registry (Eureka)
+        - config
+        - monitoring / turbine
+        - build / CI
+        - Don't know
+    validations:
+      required: true
+  - type: dropdown
+    id: run_tier
+    attributes:
+      label: How were you running it?
+      options:
+        - T1 - bare JVMs (scripts/demo/start-local.sh)
+        - T2 - docker-compose
+        - Other / not running locally
+    validations:
+      required: false
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Start the application with ...
+        2. Navigate to ...
+        3. Observe ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behaviour
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: For T1 runs, see .demo-runtime/logs.
+      render: shell
+    validations:
+      required: false
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      options:
+        - Blocker
+        - Major
+        - Minor
+    validations:
+      required: false
+  - type: checkboxes
+    id: checks
+    attributes:
+      options:
+        - label: I have not pasted any real credentials or secrets in this report
+          required: true
