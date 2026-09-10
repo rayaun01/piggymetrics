@@ -2,8 +2,8 @@ package com.piggymetrics.notification.service;
 
 import com.piggymetrics.notification.domain.NotificationType;
 import com.piggymetrics.notification.domain.Recipient;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.InjectMocks;
@@ -17,7 +17,7 @@ import javax.mail.internet.MimeMessage;
 import java.io.IOException;
 import java.util.Properties;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.MockitoAnnotations.initMocks;
@@ -36,7 +36,7 @@ public class EmailServiceImplTest {
 	@Captor
 	private ArgumentCaptor<MimeMessage> captor;
 
-	@Before
+	@BeforeEach
 	public void setup() {
 		initMocks(this);
 		when(mailSender.createMimeMessage())

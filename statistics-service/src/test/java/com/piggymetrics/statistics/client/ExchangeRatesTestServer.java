@@ -3,7 +3,9 @@ package com.piggymetrics.statistics.client;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
-import org.junit.rules.ExternalResource;
+import org.junit.jupiter.api.extension.AfterAllCallback;
+import org.junit.jupiter.api.extension.BeforeAllCallback;
+import org.junit.jupiter.api.extension.ExtensionContext;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -11,13 +13,13 @@ import java.net.InetSocketAddress;
 import java.net.URI;
 import java.time.LocalDate;
 
-final class ExchangeRatesTestServer extends ExternalResource {
+final class ExchangeRatesTestServer implements BeforeAllCallback, AfterAllCallback {
 
 	private HttpServer server;
 	private String previousRatesUrl;
 
 	@Override
-	protected void before() throws Throwable {
+	public void beforeAll(ExtensionContext context) throws Exception {
 		server = HttpServer.create(new InetSocketAddress(0), 0);
 		server.createContext("/latest", new RatesHandler());
 		server.start();
@@ -26,7 +28,7 @@ final class ExchangeRatesTestServer extends ExternalResource {
 	}
 
 	@Override
-	protected void after() {
+	public void afterAll(ExtensionContext context) {
 		server.stop(0);
 		if (previousRatesUrl == null) {
 			System.clearProperty("rates.url");
