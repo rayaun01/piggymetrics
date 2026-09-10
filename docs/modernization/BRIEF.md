@@ -82,6 +82,17 @@ infrastructure is split out of `S1` into its own stage because JaCoCo and
 flapdoodle break the build **before any test runs**, which makes them a
 prerequisite rather than work that rides along (`05-…:42-43`).
 
+**Proposed amendment — pending Gate 3, not yet approved.** Code scan
+`scan-abc9de1997d146da80002131c5d569bc` (2026-09-10) reports 36 open findings,
+3 critical. `docs/modernization/SECURITY-REMEDIATION-PLAN.md` sequences them
+against this ladder and proposes one new stage **1b `stage-1b-security-baseline`**
+(committed credentials, host-published internal ports, unauthenticated Eureka,
+PII logging) plus security exit criteria on stages 2–5. Stage 1b is placed after
+stage 1 and before stage 2 because it deliberately changes T1 responses and
+therefore **re-captures the golden master** that stages 2–5 compare against.
+Stage 1 is unaffected by the amendment. Until the approver rules, the approved
+ladder is the five stages in the table above.
+
 Ownership: the orchestrating session owns coordinated cuts and the shared files
 `config/src/main/resources/shared/*.yml` and `pom.xml`. **Delegated units never
 edit those files**; a fan-out agent that needs a shared-file change reports the
@@ -233,7 +244,13 @@ and when it blocks.
 7. **Do `com.sun.*` APIs remain available on JDK 21?** Verified for 17 only
    (`05-…:597-601`, D-18). Blocks nothing before a JDK 21 stage, which is not
    in this ladder.
-8. **Memory headroom under Boot 3 defaults** with `-Xmx200m` /
+9. **What replaces the committed `.env` for local development?** Every demo
+   script defaults to `${…:-password}` (`scripts/demo/start-local.sh:71,77,81,101-107`,
+   `seed-local.sh:6`), so removing the committed defaults breaks T1 unless the
+   harness generates a secret per run. A generated secret keeps T1
+   reproducible; a developer-supplied secret is stricter but makes the golden
+   master environment-dependent. Blocks the proposed stage 1b, not stage 1.
+10. **Memory headroom under Boot 3 defaults** with `-Xmx200m` /
    `-XX:MaxMetaspaceSize=128m` (`05-…:609-610`, D-21). Measurable only once a
    unit reaches Boot 3; blocks the stage-5 T1 tier if it fails.
 
