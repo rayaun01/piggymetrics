@@ -456,3 +456,91 @@ Then retry the normal start command. Do not
 change the harness or silently continue with a mixed pre-bump/post-bump
 runtime. The successful retry reached `T1 core stack is ready` in
 `/home/ubuntu/stage2/artifacts/t1-after-start-2.log`.
+
+---
+
+# Stage 3 playbook — Netflix and OAuth2 retirement (D-03…D-07, D-18, D-24)
+
+Stage 3 differs from Stages 1-2 in kind: it rewrites request-path behaviour, so
+"the build is green" proves almost nothing. Everything below assumes Java 8,
+Boot `2.3.12.RELEASE` and Spring Cloud `Hoxton.SR12` stay frozen — reaching for
+a newer Boot or Spring Security to make a step fit is the one move that
+invalidates the stage.
+
+## 0. Facts you need before you start
+
+| Fact | Value |
+| --- | --- |
+| Branch point | Stage 2's accepted head (`647ac6f`) |
+| Frozen versions | Boot `2.3.12.RELEASE`, Spring Cloud `Hoxton.SR12`, Temurin 8 |
+| Spring Security on the graph | `5.3.9` — this is what blocks `SecurityFilterChain` and Spring Authorization Server |
+| Reactor after D-07 | seven modules, one profile, 59 tests |
+| Oracle to hold | the Stage 1 T1 wire text, compared as text |
+
+## 1. Ordering, and why
+
+1. **D-07 first.** It is pure deletion, it shrinks the reactor, and it removes
+   the Hystrix stream dependencies that otherwise confuse the D-05 diagnosis.
+2. **D-05 next**, in the same unit as D-07, because both touch
+   `account-service`'s POM and `shared/account-service.yml`.
+3. **D-03 + D-06 together**, in `gateway` only. Routes and load balancing are
+   one change: `lb://` URIs only mean anything once the Zuul starter is gone.
+4. **D-04 + D-18 last**, because a broken security layer makes every other
+   slice's runtime proof unrunnable.
+
+Run 1-2, 3 and 4 as three parallel units — they share no file. The
+orchestrator keeps the root `pom.xml`, `shared/application*.yml`, the CI
+workflow and `docker-compose*.yml` integration; a child that edits those
+produces a conflict for no benefit.
+
+## 2. Traps that cost real time
+
+1. **The Feign builder** (D-05). After removing `feign.hystrix.enabled`, check
+   at runtime that the fallback still fires — do not trust a green context test.
+   Sleuth `2.2.8` contributes a plain `Feign.Builder` that silently disables
+   circuit-breaker wrapping. Fix with a prototype-scoped
+   `FeignCircuitBreaker.builder()` bean supplied via
+   `@EnableFeignClients(defaultConfiguration = …)`.
+2. **The `sub` claim** (D-04). `JwtAccessTokenConverter` writes `user_name`;
+   `JwtAuthenticationToken` reads `sub`. Add a `TokenEnhancer` that sets `sub`,
+   or every `principal.getName()` silently becomes `null`.
+3. **`#oauth2.hasScope(...)`** does not resolve under JWT authentication. Use
+   `hasAuthority('SCOPE_…')` and re-prove the 403.
+4. **A `ClientRegistrationRepository` bean** switches on Boot's
+   `OAuth2WebSecurityConfiguration` and its default login chain. Build the
+   repository inside the `OAuth2AuthorizedClientManager` `@Bean` instead.
+5. **The warm-up window.** For the first ~30-60s after boot, account-service's
+   Ribbon list for `statistics-service` is empty, the fallback fires, and
+   `/statistics/current` is `[]`. Warm the chain before capturing T1
+   (`/home/ubuntu/stage3/warm-probe.sh`); this is not a Stage 3 regression, and
+   the same artifact is recorded at the Stage 2 baseline.
+6. **`JAVA_BIN`** in `scripts/demo/start-local.sh` defaults to a JDK path that
+   no longer exists on the box; pass
+   `JAVA_BIN=/usr/lib/jvm/temurin-8-jdk-amd64/bin/java`.
+
+## 3. Commands
+
+```bash
+# T0 — one profile now; -Pfull no longer exists
+JAVA_HOME=/usr/lib/jvm/temurin-8-jdk-amd64 mvn -B -fae verify
+
+# T1 — boot, warm, capture, compare as text
+JAVA_BIN=/usr/lib/jvm/temurin-8-jdk-amd64/bin/java \
+  MONGO_BIN=/usr/local/bin/mongod scripts/demo/start-local.sh
+MONGO_BIN=/usr/local/bin/mongod scripts/demo/smoke.sh
+bash /home/ubuntu/stage3/warm-probe.sh
+bash /home/ubuntu/stage1/capture-t1.sh /tmp/t1.txt
+diff -u /home/ubuntu/stage1/t1-after.txt /tmp/t1.txt   # date line only
+
+# Route + security matrix
+bash /home/ubuntu/stage3/route-security-proof.sh
+```
+
+## 4. Exit gates
+
+The stage is done when T0 is 59/59 with unchanged per-class counts, the T1 text
+diff is empty apart from the ambient stub date, every route and security row
+matches the table in the Stage 3 uplift notes §7, the fallback is proved to fire
+at runtime, and each difference is adjudicated as intended with a register
+citation. D-13, Spring Authorization Server, in-service Ribbon and the Feign
+builder adapter are Stage 4 work and must be listed as deferred, not attempted.

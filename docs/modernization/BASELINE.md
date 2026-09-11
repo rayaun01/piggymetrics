@@ -146,3 +146,62 @@ dual-JDK comparison is Stage 4.
 D-07 is owned by Stage 3. Stage 2 touches no messaging code and no Compose
 files, so a T3/AMQP run is deliberately deferred to Stage 3 rather than
 recorded as a Stage 2 result.
+
+---
+
+# Stage 3 baseline — recorded before any integration edit
+
+Sections 1-5 above are the Stage 2 record and are unchanged. This section is
+the `BASELINE_PATH` entry for Stage 3 `netflix-oauth`.
+
+## 1. Captured baseline revision
+
+| Item | Value |
+| --- | --- |
+| `BASELINE_REVISION` (captured) | `647ac6f` (`stage-2-boot-23-hoxton` revised head, the D-15 date-format pin) |
+| Stage 3 integration branch | `stage-3-netflix-oauth`, created at that revision |
+| Source coordinates | Java 8 / Spring Boot `2.3.12.RELEASE` / Spring Cloud `Hoxton.SR12` |
+| Stage 3 target coordinates | unchanged — Boot and Spring Cloud are frozen for this stage; only the Netflix and OAuth2 stacks move |
+| Toolchain | Temurin 8 (`/usr/lib/jvm/temurin-8-jdk-amd64`), Maven 3.6.3, mirror `aliyun-central` |
+| Capture date | 2026-09-11 |
+
+## 2. T0 — inherited, not re-measured
+
+Stage 3 branches off the accepted Stage 2 head, so the Stage 2 *after* tables
+are the Stage 3 *before* tables by construction: 59 tests over seven modules on
+the default reactor and 61 with `-Pfull` (adding `monitoring` and
+`turbine-stream-service`, one test each), zero failures, errors or skips. The
+per-module and per-class breakdowns are §2 above; they were produced at
+`647ac6f` and not re-run here, because no commit exists between that revision
+and this branch point.
+
+## 3. T1 — the frozen wire oracle carried into Stage 3
+
+Stage 3 inherits the same golden master, which has now survived two stages
+byte-for-byte: `/home/ubuntu/stage1/t1-after.txt` (Stage 1) reproduced by
+`/home/ubuntu/stage2/artifacts/gm-after-r2.txt` (Stage 2, after the D-15 pin).
+The four contract properties from `BRIEF.md` §5 — `0.0330` / `0.6800`,
+`"USD":1` beside `"JPY":147.85`, `INCOMES_AMOUNT` `2.2341`, and the `+0000`
+Jackson date form — are the values Stage 3 must still emit, even though Stage 3
+changes the token format, the edge proxy and the circuit breaker underneath.
+
+## 4. Proof mode
+
+**Target-only.** Java 8 on both sides, as in Stages 1-2; the first dual-JDK
+comparison is Stage 4. Stage 3 adds two proof tiers the earlier stages did not
+need, because it rewrites request-path behaviour rather than versions: a route
+matrix over the four Gateway routes plus the static UI, and a security matrix
+over token issuance, valid-token acceptance, absent/garbage-token rejection and
+scope gating.
+
+## 5. T3 (AMQP / D-07) — already measured, and deliberately not re-run
+
+The T3 measurement that Stage 3 needs was taken during Stage 1 at Ray's
+request, and it is the evidence for what D-07 deletes rather than a check on
+what D-07 produces. It recorded publishers emitting to the
+`springCloudHystrixStream` exchange, `turbine-stream-service` consuming it, SSE
+frames naming `account-service.AuthServiceClient#createUser(User)` and
+`account-service.StatisticsServiceClient#updateStatistics(String,Account)`, and
+roughly 244 KB proxied through the dashboard. Re-running it after D-07 is
+impossible by definition: the tier no longer exists. See the Stage 3 uplift
+notes for the accepted-loss argument this forces.
