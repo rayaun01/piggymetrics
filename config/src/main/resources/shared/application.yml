@@ -21,6 +21,8 @@ security:
   oauth2:
     resource:
       user-info-uri: http://auth-service:5000/uaa/users/current
+  jwt:
+    jwk-set-uri: http://auth-service:5000/uaa/.well-known/jwks.json
 
 spring:
   jackson:

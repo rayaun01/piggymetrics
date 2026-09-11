@@ -44,16 +44,6 @@
 		<module>notification-service</module>
 	</modules>
 
-	<profiles>
-		<profile>
-			<id>full</id>
-			<modules>
-				<module>monitoring</module>
-				<module>turbine-stream-service</module>
-			</modules>
-		</profile>
-	</profiles>
-
 	<build>
 		<plugins>
 			<plugin>
