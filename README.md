@@ -68,8 +68,8 @@ GET	| /api/fraud/alerts/{accountName}	| Get all fraud alerts for an account
 PUT	| /api/fraud/alerts/{alertId}/review	| Review a fraud alert
 GET	| /api/fraud/risk/{accountName}	| Get risk summary for an account
 
-### Compliance Service (.NET Core 2.1)
-Handles regulatory compliance checking, audit logging, and KYC/AML monitoring. Supports EU banking regulations including GDPR, PSD2, DORA, and MiFID.
+### Compliance Service (.NET 8)
+Handles regulatory compliance checking, audit logging, and KYC/AML monitoring. Supports EU banking regulations including GDPR, PSD2, DORA, and MiFID. All endpoints below require an OAuth2 bearer token from auth-service; see [compliance-service/README.md](compliance-service/README.md) for the required configuration.
 
 Method	| Path	| Description
 ------------- | ------------------------- | -------------
