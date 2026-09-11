@@ -10,7 +10,6 @@ import com.piggymetrics.statistics.domain.TimePeriod;
 import com.piggymetrics.statistics.domain.timeseries.DataPoint;
 import com.piggymetrics.statistics.domain.timeseries.DataPointId;
 import com.piggymetrics.statistics.service.StatisticsService;
-import com.sun.security.auth.UserPrincipal;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -18,6 +17,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -65,7 +65,7 @@ public class StatisticsControllerTest {
 		when(statisticsService.findByAccountName(dataPoint.getId().getAccount()))
 				.thenReturn(ImmutableList.of(dataPoint));
 
-		mockMvc.perform(get("/test").principal(new UserPrincipal(dataPoint.getId().getAccount())))
+		mockMvc.perform(get("/test").principal(new UsernamePasswordAuthenticationToken(dataPoint.getId().getAccount(), null)))
 				.andExpect(jsonPath("$[0].id.account").value(dataPoint.getId().getAccount()))
 				.andExpect(status().isOk());
 	}
@@ -79,7 +79,7 @@ public class StatisticsControllerTest {
 		when(statisticsService.findByAccountName(dataPoint.getId().getAccount()))
 				.thenReturn(ImmutableList.of(dataPoint));
 
-		mockMvc.perform(get("/current").principal(new UserPrincipal(dataPoint.getId().getAccount())))
+		mockMvc.perform(get("/current").principal(new UsernamePasswordAuthenticationToken(dataPoint.getId().getAccount(), null)))
 				.andExpect(jsonPath("$[0].id.account").value(dataPoint.getId().getAccount()))
 				.andExpect(status().isOk());
 	}
