@@ -189,7 +189,7 @@ function initStatisticPage() {
 		else {container = "#expenses-lines-container"; idSorted = expensesIdSorted; maxConvertedId = expensesIdSorted[0]; sum = expensesSumMonth; i=100}
 
 		idSorted.forEach(function(id) {
-			$(container).append('<div id="line-' + i + '" class="itemline"><span class="lineitemtitle lightcircletitle">' + column[id].title + '</span><div class="lineitempercent">'+ Math.round(100 * column[id].converted / sum) +'%</div><div class="lineitemvalue">' + separateNumber(Math.round(column[id].converted)) + ' <span class="boldcircletitle curr lineitemcurr"></span><span class="lightcircletitle lineitemcurr">/Month</span></div><div class="leftpoint"></div><div id="linebackground-'+ i +'" class="itemlinebackground"></div></div>');
+			$(container).append('<div id="line-' + i + '" class="itemline"><span class="lineitemtitle lightcircletitle">' + escape(column[id].title) + '</span><div class="lineitempercent">'+ Math.round(100 * column[id].converted / sum) +'%</div><div class="lineitemvalue">' + separateNumber(Math.round(column[id].converted)) + ' <span class="boldcircletitle curr lineitemcurr"></span><span class="lightcircletitle lineitemcurr">/Month</span></div><div class="leftpoint"></div><div id="linebackground-'+ i +'" class="itemlinebackground"></div></div>');
 			$("#line-" + i).data({"item": column[id]}).css({"width": Math.round(100 * column[ id ].converted / column[maxConvertedId].converted ) + "%"});
 			$("#linebackground-" + i).addClass(column[id].icon);
 			i++;
@@ -531,7 +531,7 @@ function animatecircle(beforevalue, aftervalue, sum, title) {
 		}
 		else {
 			$("#" + id + "-value").html( separateNumber(aftervalue) )
-			$("#" + id + "-title").html(title);
+			$("#" + id + "-title").text(title);
 		}
 	})();
 }
