@@ -131,7 +131,7 @@ by hand.
 | D-01 | The root `pom.xml` changed exactly two values: the Boot parent `2.0.3.RELEASE` → `2.3.12.RELEASE` and `spring-cloud.version` `Finchley.RELEASE` → `Hoxton.SR12`. No other shared POM or configuration edit was part of the fan-out. | Shared file; all 9 units. `docs/modernization/DELTA-CATALOG.md:80-94` | hand |
 | D-16 | The resolved MongoDB driver moved from `org.mongodb:mongodb-driver` plus `bson`/`mongodb-driver-core` `3.6.4` to `org.mongodb:mongodb-driver-sync` plus `bson`/`mongodb-driver-core` `4.0.6`. This was transitive from the BOM; no application code change was required. The `com.mongodb.DBObject`-typed statistics converters and the `CustomConversions` beans in statistics-service and notification-service still work. Spring Data MongoDB `3.0.9.RELEASE` declares `CustomConversions` as extending `MongoCustomConversions`; `javap` verification of the resolved jar therefore shows why Boot's `@ConditionalOnMissingBean(MongoCustomConversions.class)` back-off still sees the bean. The user converters were registered in `/home/ubuntu/stage2/artifacts/fanout-statistics-service-converter-trace-argline.log:247-248,508-509` and `/home/ubuntu/stage2/artifacts/fanout-notification-service-converter-trace.log:247-248,498-499`. | auth, account, statistics, notification; stored-document compatibility. `docs/modernization/DELTA-CATALOG.md:336-353` | hand |
 | D-09 driver-coupled half | Flapdoodle moved from `de.flapdoodle.embed.mongo:2.0.3` and `embed.process:2.0.2` to `embed.mongo:2.2.0` and `embed.process:2.1.2`. Boot 2.3 still ships `EmbeddedMongoAutoConfiguration`, which continued to drive Flapdoodle and started the embedded MongoDB `3.5.5` binary. This is the half Stage 1 explicitly deferred; the deferral is recorded at `docs/as-is/05-dependency-and-eol-register.md:312` and in Stage 1 §4 above. | auth, account, statistics, notification repository tests. `/home/ubuntu/stage2/artifacts/pilot-account-deps-before-flapdoodle.log`; `/home/ubuntu/stage2/artifacts/pilot-account-deps-after-flapdoodle.log`; `/home/ubuntu/stage2/artifacts/pilot-account-verify.log` | hand |
-| D-15 | Boot 2.3.12 manages Jackson `2.11.4` where Boot 2.0.3 managed `2.9.6`. The adjudicated intended wire difference is Jackson's `java.util.Date` offset form: `+0000` → `+00:00` in `/statistics/current` `id.date`, and the same unnormalized change was confirmed for `Account.lastSeen` on `/accounts/current` and `/accounts/demo`. No application code, annotation, or `spring.jackson.*` setting changed. This is the D-15 risk recorded at `docs/modernization/DELTA-CATALOG.md:316-334` and `docs/as-is/05-dependency-and-eol-register.md:513`. | REST wire contract; account and statistics consumers. `/home/ubuntu/stage2/artifacts/gm-before-vs-after.diff` | hand |
+| D-15 | Boot 2.3.12 manages Jackson `2.11.4` where Boot 2.0.3 managed `2.9.6`. Left at its defaults the move drifts Jackson's `java.util.Date` offset form `+0000` → `+00:00` in `/statistics/current` `id.date`, and the same unnormalized drift was confirmed for `Account.lastSeen` on `/accounts/current` and `/accounts/demo` (`/home/ubuntu/stage2/artifacts/gm-before-vs-after.diff`). Jackson 2.11's `StdDateFormat` default *is* `+00:00`; the drift is the documented D-15 risk at `docs/modernization/DELTA-CATALOG.md:316-334` and `docs/as-is/05-dependency-and-eol-register.md:513` and was adjudicated intended rather than a regression. Stage 2 nevertheless **pins the format to hold the recorded oracle** instead of accepting the drift: `spring.jackson.date-format: yyyy-MM-dd'T'HH:mm:ss.SSSZ` with `spring.jackson.time-zone: UTC` in `config/src/main/resources/shared/application.yml`. The explicit zone is required because a pattern-based `SimpleDateFormat` would otherwise follow the JVM default zone, whereas `StdDateFormat` defaulted to UTC. With the pin the wire text is byte-identical to the pre-bump and Stage 1 captures with zero adjudicated differences. The oracle was held, not re-recorded, so the Boot 3 stage re-raises the choice deliberately. | REST wire contract; account and statistics consumers. `/home/ubuntu/stage2/artifacts/gm-before-vs-after-r2.daynorm.diff` and `/home/ubuntu/stage2/artifacts/gm-stage1-vs-after-r2.daynorm.diff`, both empty | hand |
 | D-23 | The two server-side JavaScript repository predicates remained unchanged. Evidence (a) passed on embedded MongoDB `3.5.5` with driver `4.0.6`: `RecipientRepositoryTest` ran 5/5, including `shouldFindReadyForRemindWhenFrequencyIsWeeklyAndLastNotifiedWas8DaysAgo` and `shouldNotFindReadyForBackupWhenFrequencyIsQuaterly`, whose assertions require non-empty results. Evidence (b) passed against the live T1 MongoDB `3.2.2`: both verbatim `$where` predicates matched the seeded recipient once, with no JavaScript-disabled error. Evidence (c), the scheduled application path, was not exercised because the served daily windows `0 0 0 * * *` and `0 0 12 * * *` had elapsed before notification-service started. | notification-service; scheduling behavior. `/home/ubuntu/stage2/artifacts/fanout-notification-service.log`, `/home/ubuntu/stage2/artifacts/d23-mongo-shell.txt`, `/home/ubuntu/stage2/artifacts/d23-notification-config.txt` | hand |
 | OAuth2 bean-definition override | Boot 2.3 startup exposed a duplicate `oauth2ClientContext` definition. `@EnableOAuth2Client` is present at `account-service/.../AccountApplication.java:13`, `statistics-service/.../StatisticsApplication.java:23`, and `notification-service/.../NotificationServiceApplication.java:20`; the three services also receive `security.oauth2.client.*` from `config/src/main/resources/shared/account-service.yml:1-8`, `shared/statistics-service.yml:1-8`, and `shared/notification-service.yml:1-8`. The Boot 2.1+ default `spring.main.allow-bean-definition-overriding=false` made the collision fatal. The register records the OAuth starter at `docs/as-is/05-dependency-and-eol-register.md:101`, resolved OAuth artifacts at `:242-243`, the Hoxton removal boundary at `:342-343`, and the early hard wall at `:375-379`. The fix is narrowly scoped to `spring.main.allow-bean-definition-overriding: true` in each affected service's own `bootstrap.yml`; the shared Config Server delivery was packaged and served but empirically did not take effect early enough, so the fallback was required. T0 did not expose this because its test contexts never received the secured `security.oauth2.client.*` properties after the Config Server 401, so the OAuth autoconfiguration path backed off. | account-service, statistics-service, notification-service. `/home/ubuntu/stage2/artifacts/config-verify-oauth-override.log`, `/home/ubuntu/stage2/artifacts/t1-after-notification-service.log`, `/home/ubuntu/stage2/artifacts/t1-after-start-2.log` | hand |
 
@@ -172,7 +172,7 @@ comparison is Stage 4.
 | OAuth2 rework | Not done. The register calls this an early hard wall at `docs/as-is/05-dependency-and-eol-register.md:375-379`. |
 | Removing `@EnableOAuth2Client` | Not done. It remains the deferred alternative to the narrowly scoped bean-overriding flag. |
 | D-07 / T3 AMQP verification | Not done; D-07 and T3 remain later-stage work. |
-| Restoring the `+0000` Jackson date form | Not done. It is restorable with one `spring.jackson.date-format` setting, but this stage records the adjudicated intended D-15 drift rather than suppressing it. The decision remains with Ray because D-15's recorded oracle explicitly lists `+0000`. |
+| Revisiting the pinned Jackson date form | Deferred. Stage 2 pins `spring.jackson.date-format` so the `+0000` oracle holds (§1, D-15). The pin is a deliberate hold, not a permanent decision: the Boot 3 stage should re-raise whether to keep the basic-offset form or adopt the library default. |
 
 ## 5. Per-unit target build results and baseline reproduction
 
@@ -223,10 +223,28 @@ The regenerated tables are:
 
 T1 reached `T1 core stack is ready`; the smoke artifact ended with
 `Smoke test passed` at
-`/home/ubuntu/stage2/artifacts/t1-after-smoke.log`. The post-bump golden
-master was byte-identical except for the adjudicated Jackson date-offset line
-(`+0000` → `+00:00`):
-`/home/ubuntu/stage2/artifacts/gm-before-vs-after.diff`.
+`/home/ubuntu/stage2/artifacts/t1-after-smoke.log`. Before the D-15 pin the
+post-bump golden master was byte-identical except for the Jackson date-offset
+line (`+0000` → `+00:00`):
+`/home/ubuntu/stage2/artifacts/gm-before-vs-after.diff`. After the pin the
+capture at `/home/ubuntu/stage2/artifacts/gm-after-r2.txt` has **zero**
+adjudicated differences against both the pre-bump capture and Stage 1's
+recorded oracle:
+`/home/ubuntu/stage2/artifacts/gm-before-vs-after-r2.daynorm.diff` and
+`/home/ubuntu/stage2/artifacts/gm-stage1-vs-after-r2.daynorm.diff` are both
+empty. Those two comparisons additionally normalize the `DataPointId` day,
+which is the capture day and the only field left volatile by the Stage 1
+capture filter; the day is rewritten while the time and offset text stay under
+comparison, so the `+0000` form the pin exists to hold remains proven by the
+raw capture and by raw `lastSeen=2026-09-11T03:14:24.546+0000` in
+`/home/ubuntu/stage2/artifacts/lastseen-r2.txt`. Because a
+`spring.jackson.date-format` pattern also governs deserialization, a
+server-rendered date was echoed back verbatim through
+`PUT /notifications/recipients/current` and accepted with HTTP 200
+(`/home/ubuntu/stage2/artifacts/date-roundtrip-r2.txt`). T0 after the pin is
+unchanged at 59 / 61:
+`/home/ubuntu/stage2/artifacts/t0-after-r2-default.log`,
+`/home/ubuntu/stage2/artifacts/t0-after-r2-full.log`.
 
 ## 6. Playbook pointer and remaining gaps
 
@@ -239,8 +257,8 @@ Remaining gaps after Stage 2 are:
 1. D-23 evidence (c), the scheduled application execution path, was not
    exercised because both daily cron windows had elapsed before
    notification-service started.
-2. Ray's decision on whether the D-15 `+00:00` date-offset drift should be
-   restored to the documented `+0000` oracle.
+2. Whether the pinned Jackson date format should survive the Boot 3 stage, or
+   the library default be adopted there with a deliberate oracle change.
 3. The validation-starter transitivity hazard described in §3.
 4. Browser-test evidence, which lives in the PR rather than this repository
    note.

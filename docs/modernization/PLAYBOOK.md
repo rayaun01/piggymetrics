@@ -232,7 +232,8 @@ to:
 ```
 
 Do not change `java.version`, Surefire, the enforcer, repositories, or Maven
-settings. No other shared file is part of this fan-out.
+settings. The only other shared edit in this stage is the D-15 Jackson pin in
+`config/src/main/resources/shared/application.yml` described in §7.
 
 ## 2. Ordered fan-out procedure
 
@@ -386,6 +387,43 @@ negative Config Server result is recorded in
 `/home/ubuntu/stage2/artifacts/config-verify-oauth-override.log` and the
 failed service evidence; the successful restart is
 `/home/ubuntu/stage2/artifacts/t1-after-start-2.log`.
+
+### D-15 Jackson date-format pin
+
+Boot 2.3.12 brings Jackson `2.11.4`, whose `StdDateFormat` writes the
+`java.util.Date` offset as `+00:00`. Boot 2.0.3's Jackson `2.9.6` wrote
+`+0000`, which is the recorded T1 oracle. To hold the oracle rather than
+accept the drift, add to the `spring:` block of
+`config/src/main/resources/shared/application.yml`:
+
+```yaml
+spring:
+  jackson:
+    date-format: yyyy-MM-dd'T'HH:mm:ss.SSSZ
+    time-zone: UTC
+```
+
+The explicit `time-zone` is not optional: a pattern-based `SimpleDateFormat`
+follows the JVM default zone, where `StdDateFormat` defaulted to UTC, so
+without it the rendered offset tracks the box's zone. Shared
+`application.yml` is the right home — unlike the bootstrap-phase property in
+the OAuth2 section below, this one is bound normally and Config Server
+delivery works.
+
+Verify it at T1, not only in tests: T0 contexts never exercise the wire
+format. The proof is an empty text diff of the golden-master capture against
+both the pre-bump capture and Stage 1's recorded oracle, plus a verbatim
+round-trip of a server-rendered date back through
+`PUT /notifications/recipients/current` — a `date-format` pattern governs
+deserialization too, so a client echoing a date back must still be accepted.
+
+When comparing captures taken on different calendar days, normalize the
+`DataPointId` day — it is the capture day — by rewriting only the date part
+and leaving the time and offset text under comparison:
+
+```bash
+sed 's/"date":"[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}T/"date":"YYYY-MM-DDT/g'
+```
 
 ### Stale T1 MongoDB process
 
