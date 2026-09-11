@@ -1,5 +1,6 @@
 using System;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using PiggyMetrics.Compliance.Models;
 using PiggyMetrics.Compliance.Services;
@@ -8,6 +9,7 @@ namespace PiggyMetrics.Compliance.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize]
     public class ComplianceController : ControllerBase
     {
         private readonly IComplianceService _complianceService;

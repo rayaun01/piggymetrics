@@ -35,6 +35,10 @@ namespace PiggyMetrics.Compliance.Models
         [BsonElement("timestamp")]
         public DateTime Timestamp { get; set; }
 
+        [BsonElement("amount")]
+        [BsonIgnoreIfNull]
+        public decimal? Amount { get; set; }
+
         [BsonElement("metadata")]
         public Dictionary<string, string> Metadata { get; set; }
 

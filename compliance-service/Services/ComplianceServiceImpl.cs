@@ -1,8 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
-using MongoDB.Driver;
+using Microsoft.Extensions.Logging;
 using PiggyMetrics.Compliance.Models;
 using PiggyMetrics.Compliance.Repository;
 
@@ -21,7 +22,8 @@ namespace PiggyMetrics.Compliance.Services
     {
         private readonly IAuditLogRepository _auditRepo;
         private readonly IComplianceRuleRepository _ruleRepo;
-        private readonly IMongoCollection<ComplianceReport> _reports;
+        private readonly IComplianceReportRepository _reportRepo;
+        private readonly ILogger<ComplianceServiceImpl> _logger;
 
         private static readonly decimal AML_SINGLE_TRANSACTION_LIMIT = 10000m;
         private static readonly decimal AML_DAILY_AGGREGATE_LIMIT = 25000m;
@@ -29,11 +31,13 @@ namespace PiggyMetrics.Compliance.Services
         public ComplianceServiceImpl(
             IAuditLogRepository auditRepo,
             IComplianceRuleRepository ruleRepo,
-            IMongoDatabase database)
+            IComplianceReportRepository reportRepo,
+            ILogger<ComplianceServiceImpl> logger)
         {
             _auditRepo = auditRepo;
             _ruleRepo = ruleRepo;
-            _reports = database.GetCollection<ComplianceReport>("compliance_reports");
+            _reportRepo = reportRepo;
+            _logger = logger;
         }
 
         public async Task<AuditLog> LogEvent(AuditLog auditLog)
@@ -66,23 +70,32 @@ namespace PiggyMetrics.Compliance.Services
 
             foreach (var log in transactionLogs)
             {
-                if (log.Metadata != null && log.Metadata.ContainsKey("amount"))
+                var amount = ResolveTransactionAmount(log);
+                if (!amount.HasValue)
                 {
-                    if (decimal.TryParse(log.Metadata["amount"], out decimal amount))
+                    violations.Add(new ComplianceViolation
                     {
-                        if (amount >= AML_SINGLE_TRANSACTION_LIMIT)
-                        {
-                            violations.Add(new ComplianceViolation
-                            {
-                                RuleCode = "AML-001",
-                                Regulation = "AML",
-                                Description = $"Transaction amount {amount} exceeds single transaction reporting threshold",
-                                Severity = ComplianceSeverity.Warning,
-                                DetectedAt = DateTime.UtcNow,
-                                TransactionId = log.Id
-                            });
-                        }
-                    }
+                        RuleCode = "AML-002",
+                        Regulation = "AML",
+                        Description = "Transaction could not be screened: no usable amount on the audit record",
+                        Severity = ComplianceSeverity.Warning,
+                        DetectedAt = DateTime.UtcNow,
+                        TransactionId = log.Id
+                    });
+                    continue;
+                }
+
+                if (amount.Value >= AML_SINGLE_TRANSACTION_LIMIT)
+                {
+                    violations.Add(new ComplianceViolation
+                    {
+                        RuleCode = "AML-001",
+                        Regulation = "AML",
+                        Description = $"Transaction amount {amount.Value} exceeds single transaction reporting threshold",
+                        Severity = ComplianceSeverity.Warning,
+                        DetectedAt = DateTime.UtcNow,
+                        TransactionId = log.Id
+                    });
                 }
             }
 
@@ -100,7 +113,7 @@ namespace PiggyMetrics.Compliance.Services
                 RiskScore = CalculateRiskScore(violations)
             };
 
-            await _reports.InsertOneAsync(report);
+            await _reportRepo.Create(report);
             return report;
         }
 
@@ -112,6 +125,32 @@ namespace PiggyMetrics.Compliance.Services
         public async Task<ComplianceRule> CreateRule(ComplianceRule rule)
         {
             return await _ruleRepo.Create(rule);
+        }
+
+        private decimal? ResolveTransactionAmount(AuditLog log)
+        {
+            if (log.Amount.HasValue)
+            {
+                return log.Amount.Value;
+            }
+
+            if (log.Metadata == null || !log.Metadata.TryGetValue("amount", out var rawAmount))
+            {
+                _logger.LogWarning(
+                    "Transaction audit log {AuditLogId} for account {AccountName} carries no amount; AML screening skipped",
+                    log.Id, log.AccountName);
+                return null;
+            }
+
+            if (!decimal.TryParse(rawAmount, NumberStyles.Number, CultureInfo.InvariantCulture, out var parsed))
+            {
+                _logger.LogWarning(
+                    "Transaction audit log {AuditLogId} for account {AccountName} has an unparseable amount {RawAmount}; AML screening skipped",
+                    log.Id, log.AccountName, rawAmount);
+                return null;
+            }
+
+            return parsed;
         }
 
         private List<ComplianceViolation> CheckRule(ComplianceRule rule, List<AuditLog> logs)
