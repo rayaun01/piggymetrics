@@ -7,7 +7,6 @@ import com.piggymetrics.notification.domain.NotificationSettings;
 import com.piggymetrics.notification.domain.NotificationType;
 import com.piggymetrics.notification.domain.Recipient;
 import com.piggymetrics.notification.service.RecipientService;
-import com.sun.security.auth.UserPrincipal;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -15,6 +14,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -52,7 +52,7 @@ public class RecipientControllerTest {
 		Recipient recipient = getStubRecipient();
 		String json = mapper.writeValueAsString(recipient);
 
-		mockMvc.perform(put("/recipients/current").principal(new UserPrincipal(recipient.getAccountName())).contentType(MediaType.APPLICATION_JSON).content(json))
+		mockMvc.perform(put("/recipients/current").principal(new UsernamePasswordAuthenticationToken(recipient.getAccountName(), null)).contentType(MediaType.APPLICATION_JSON).content(json))
 				.andExpect(status().isOk());
 	}
 
@@ -62,7 +62,7 @@ public class RecipientControllerTest {
 		Recipient recipient = getStubRecipient();
 		when(recipientService.findByAccountName(recipient.getAccountName())).thenReturn(recipient);
 
-		mockMvc.perform(get("/recipients/current").principal(new UserPrincipal(recipient.getAccountName())))
+		mockMvc.perform(get("/recipients/current").principal(new UsernamePasswordAuthenticationToken(recipient.getAccountName(), null)))
 				.andExpect(jsonPath("$.accountName").value(recipient.getAccountName()))
 				.andExpect(status().isOk());
 	}

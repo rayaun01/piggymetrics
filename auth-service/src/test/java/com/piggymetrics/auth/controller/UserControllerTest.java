@@ -3,7 +3,6 @@ package com.piggymetrics.auth.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.piggymetrics.auth.domain.User;
 import com.piggymetrics.auth.service.UserService;
-import com.sun.security.auth.UserPrincipal;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -11,6 +10,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -67,7 +67,7 @@ public class UserControllerTest {
 
 	@Test
 	public void shouldReturnCurrentUser() throws Exception {
-		mockMvc.perform(get("/users/current").principal(new UserPrincipal("test")))
+		mockMvc.perform(get("/users/current").principal(new UsernamePasswordAuthenticationToken("test", null)))
 				.andExpect(jsonPath("$.name").value("test"))
 				.andExpect(status().isOk());
 	}
