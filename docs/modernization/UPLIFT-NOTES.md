@@ -415,6 +415,12 @@ with that normalized the two files are identical, so `0.0330`, `0.6800`,
 `"USD":1`, `"JPY":147.85`, `2.2341` and the `+0000` date form all survive the
 JWT, Gateway and Resilience4j rewrites.
 
+The D-05 fallback was proved by killing `statistics-service` and repeating the
+account update: three PUTs returned 200 in under 20 ms each, the note persisted,
+and `StatisticsServiceClientFallback` logged once per call
+(`/home/ubuntu/stage3/fallback-proof.txt`). Without the builder adapter of §1
+those calls would have propagated a 500 instead.
+
 Route and security matrix, `/home/ubuntu/stage3/route-security-after.txt`:
 
 ```text
@@ -472,4 +478,8 @@ Remaining gaps after Stage 3:
    or not the builder adapter is present, which is precisely how the silent
    fallback loss could have shipped. The runtime fallback probe is the only
    guard, and it lives in the PR rather than the suite.
-4. Browser-test evidence lives in the PR, as in earlier stages.
+4. Browser-test evidence lives in the PR, as in earlier stages. The integrated
+   golden path was driven end to end at `685eb55`: signup, two-stage login,
+   modal edits (Salary 1000 USD/month, Tokyo 14785 JPY/month), savings cycling
+   USD 100 → RUB 9250 → EUR 92 → USD 100, finite charts, persistence across a
+   full reload and re-login, and the read-only demo account. No console errors.
