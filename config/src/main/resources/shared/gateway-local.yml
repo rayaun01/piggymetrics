@@ -1,9 +1,32 @@
-zuul:
-  routes:
-    auth-service:
-      url: http://${AUTH_HOST:localhost}:5000
-    rates-stub:
-      path: /rates/**
-      url: ${RATES_URL:http://localhost:18080}
-      stripPrefix: true
-      sensitiveHeaders:
+spring:
+  cloud:
+    gateway:
+      # A list property is replaced, not merged, by the winning property
+      # source, so the local profile restates every route it serves.
+      routes:
+        - id: auth-service
+          uri: http://${AUTH_HOST:localhost}:5000
+          predicates:
+            - Path=/uaa/**
+
+        - id: account-service
+          uri: lb://account-service
+          predicates:
+            - Path=/accounts/**
+
+        - id: statistics-service
+          uri: lb://statistics-service
+          predicates:
+            - Path=/statistics/**
+
+        - id: notification-service
+          uri: lb://notification-service
+          predicates:
+            - Path=/notifications/**
+
+        - id: rates-stub
+          uri: ${RATES_URL:http://localhost:18080}
+          predicates:
+            - Path=/rates/**
+          filters:
+            - StripPrefix=1

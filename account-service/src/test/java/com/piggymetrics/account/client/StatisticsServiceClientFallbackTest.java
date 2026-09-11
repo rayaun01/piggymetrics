@@ -17,7 +17,7 @@ import static org.hamcrest.Matchers.containsString;
  */
 @ExtendWith(SpringExtension.class)
 @SpringBootTest(properties = {
-        "feign.hystrix.enabled=true"
+        "feign.circuitbreaker.enabled=true"
 })
 public class StatisticsServiceClientFallbackTest {
     @Autowired
@@ -40,4 +40,3 @@ public class StatisticsServiceClientFallbackTest {
     }
 
 }
-

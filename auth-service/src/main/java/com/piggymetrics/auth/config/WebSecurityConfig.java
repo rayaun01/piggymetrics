@@ -21,12 +21,12 @@ public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
 
     @Override
     protected void configure(HttpSecurity http) throws Exception {
-        // @formatter:off
         http
-                .authorizeRequests().anyRequest().authenticated()
-                .and()
-                .csrf().disable();
-        // @formatter:on
+                .authorizeRequests(a -> a
+                        .antMatchers("/.well-known/jwks.json").permitAll()
+                        .anyRequest().authenticated())
+                .csrf(csrf -> csrf.disable())
+                .oauth2ResourceServer(o -> o.jwt());
     }
 
     @Override

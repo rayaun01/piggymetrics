@@ -262,3 +262,224 @@ Remaining gaps after Stage 2 are:
 3. The validation-starter transitivity hazard described in §3.
 4. Browser-test evidence, which lives in the PR rather than this repository
    note.
+
+---
+
+# Uplift notes — Stage 3 `netflix-oauth`
+
+Stages 1 and 2 above are unchanged. This section records the completed Stage 3
+uplift on `stage-3-netflix-oauth`: the Netflix edge (Zuul, Ribbon, Hystrix,
+Turbine, the dashboard) and the legacy OAuth2 stack leave the graph, with Java
+8, Boot `2.3.12.RELEASE` and Spring Cloud `Hoxton.SR12` deliberately frozen.
+This is the first stage that changes request-path behaviour rather than
+versions, so most entries below are adjudications, not bumps.
+
+## 1. Delta → fix mapping, and how each fix was produced
+
+No OpenRewrite or other automated recipe was run; `PREFLIGHT.md` Check 2 still
+holds. Every change is hand-written and reviewed.
+
+| Delta | Fix | Produced by |
+| --- | --- | --- |
+| D-07 Hystrix metrics tier | `monitoring/` and `turbine-stream-service/` deleted, `spring-cloud-netflix-hystrix-stream` dropped from the three publishers, both Compose services removed | S3-A (`4d6680c`) |
+| D-05 Hystrix → Resilience4j | `account-service` moves to `spring-cloud-starter-circuitbreaker-resilience4j`, `@EnableCircuitBreaker` retired, `shared/account-service.yml` moves from `feign.hystrix.enabled` to `feign.circuitbreaker.enabled` + `resilience4j.*` | S3-A (`02e2c80`, `0cb2049`) |
+| D-03 Zuul → Spring Cloud Gateway | `gateway` swaps the Zuul starter for `spring-cloud-starter-gateway`, `zuul.routes.*` becomes `spring.cloud.gateway.routes[*]` predicates and filters | S3-B (`b33134f`) |
+| D-06 Ribbon → Spring Cloud LoadBalancer | `lb://` route URIs plus `spring.cloud.gateway.httpclient` timeouts replacing `ribbon.*` | S3-B (`b33134f`) |
+| D-04 opaque tokens → RS256 JWT | `auth-service` signs RS256 and publishes `/uaa/.well-known/jwks.json`; the three resource servers use `NimbusJwtDecoder` + `oauth2ResourceServer().jwt()`; `CustomUserInfoTokenServices` deleted in all three | S3-C (`2c5c306`) |
+| D-18 internal JDK test principal | `com.sun.security.auth.UserPrincipal` replaced with a supported principal in the controller tests | S3-C (`2c5c306`) |
+| Parent shared cuts | root reactor and `-Pfull` removal, dead `hystrix.*` blocks, `security.jwt.jwk-set-uri` for both profiles, `monitoring.yml`/`turbine-stream-service.yml` removal, CI step removal | this session (`d70a432`, `685eb55`) |
+
+Two implementation details are load-bearing and would be silently lost in a
+re-derivation:
+
+1. **The Feign circuit-breaker builder adapter** (`0cb2049`). With
+   `feign.hystrix.enabled` gone, Sleuth `2.2.8.RELEASE` contributes a plain
+   `Feign.Builder`, which suppresses Spring Cloud's circuit-breaker builder;
+   `FeignCircuitBreakerTargeter` then sees a plain builder and never wraps the
+   client. The application starts, every call succeeds, and the fallback is
+   simply never invoked — a silent loss of the one piece of resilience
+   behaviour D-05 exists to preserve.
+   `account-service` therefore declares `FeignCircuitBreakerBuilderConfiguration`
+   as `@EnableFeignClients(defaultConfiguration = …)`. **Remove it when Sleuth
+   is replaced by Micrometer Tracing** (Stage 4/5); it is a workaround for a
+   Sleuth interaction, not a design choice.
+2. **The `sub` claim** (`2c5c306`). `JwtAccessTokenConverter` emits `user_name`,
+   while `JwtAuthenticationToken` derives the principal name from `sub`. Without
+   a `TokenEnhancer` setting `sub`, every `principal.getName()` in
+   `/accounts/current`, `/statistics/current` and
+   `/notifications/recipients/current` resolves to `null` — again a silent
+   behaviour change that no test would catch. Relatedly, `#oauth2.hasScope(...)`
+   does not resolve under a `JwtAuthenticationToken`; `hasAuthority('SCOPE_server')`
+   is the preserving equivalent, and the scope gate was re-proved at runtime.
+
+## 2. Dual-run diff / target-only statement
+
+Target-only, per `BASELINE.md` §4 of the Stage 3 section: Java 8 on both sides.
+The proof that carries the stage is before/after at one toolchain, extended
+with the route and security matrices Stage 3 needs.
+
+## 3. Adjudicated behaviour differences
+
+Per `BRIEF.md` §5 every difference is intended, regression, or unexplained.
+There are no regressions and no unexplained differences.
+
+| # | Difference | Verdict |
+| --- | --- | --- |
+| 1 | Access tokens change from opaque UUIDs to RS256 JWTs; `/uaa/.well-known/jwks.json` is a new endpoint | **Intended, and a new capability.** Ray's explicit decision, recorded in §5 below. Register: `05-…:306-307`, `:375-379` |
+| 2 | The `-Pfull` profile and the 61-test full-profile total no longer exist; both profiles now report 59 | **Intended.** The profile existed only to add the two modules D-07 deletes, and each carried exactly one Boot context test. No test was weakened, renamed or removed: 59 = 59 across all seven surviving modules, per-class counts unchanged |
+| 3 | The Hystrix stream, Turbine aggregation and dashboard proxy are gone | **Intended, and an accepted loss of working behaviour** — see §4 |
+| 4 | Scope-gated endpoints reject with 403 via `SCOPE_server` authority instead of `#oauth2.hasScope` | **Intended.** Same status code on the same endpoints; the SpEL helper does not exist under JWT authentication |
+| 5 | `GET /statistics/demo` without a token returns 401 | **Not a difference.** The baseline `ResourceServerConfigurerAdapter` in `statistics-service` overrode no `configure(HttpSecurity)`, so every path was already authenticated; the T1 oracle calls it with a token and still gets `[]` |
+| 6 | `GET /ACCOUNT-SERVICE/accounts/current` returns 404 | **Not a difference.** Discovery-locator auto-routes were off under Zuul and are explicitly off under Gateway |
+| 7 | `/favicon.ico` 404 | **Pre-existing.** No favicon exists in the gateway's static resources on either side |
+
+## 4. D-07 as an accepted loss, argued rather than assumed
+
+`05-dependency-and-eol-register.md:562` records the Hystrix dashboard as
+returning 404 in T1, which reads as dead code. The Stage 1 T3 run disproves
+that: under Compose the tier was fully live (`BASELINE.md` §5 of the Stage 3
+section). D-07 therefore deletes **working observability behaviour**, and the
+justification is not "it was already broken" but:
+
+- `spring-cloud-netflix-hystrix-stream`, `-hystrix-dashboard` and Turbine are
+  not built for Spring Cloud 2020.0+ (`05-…:300-308`), so the tier cannot cross
+  the Stage 4 wall in any form;
+- it is a metrics/observability tier, not a functional path: no user-visible
+  feature and no persisted data depends on it, which is why its removal leaves
+  the T1 wire text byte-identical;
+- the replacement is a later, separate decision (Micrometer/Actuator plus a
+  real metrics backend), and pretending Resilience4j's own metrics are an
+  equivalent replacement would overstate what this stage delivers.
+
+Also carried forward from the Stage 1 T3 run: `docker-compose.yml` published
+`8989:8989` for a container listening on `8080`. That defect disappears with the
+service rather than being fixed.
+
+## 5. Ray's Stage 3 decisions, recorded
+
+| Gate | Decision | Consequence in this stage |
+| --- | --- | --- |
+| D-04 token strategy | **Move to JWTs**, accepted as a new capability with its own decision record | `BRIEF.md` §2 excluded JWT. This overrides that line; the override is recorded here rather than applied silently. Signing is RS256 with a key from `security.jwt.private-key` |
+| D-24 `statistics-service` Feign fallback | **Leave inert** | `ExchangeRatesClientFallback` stays unreferenced; `feign.circuitbreaker.enabled` is **not** set for `statistics-service`, so no fallback behaviour is introduced there |
+| D-17 Jackson 1.x `@JsonIgnoreProperties` | **Delete it** | Deliberately *not* in this stage; it lands as a follow-up once the Codehaus artifacts are confirmed off the resolved graph, which is the ordering the catalog requires |
+
+## 6. Deferred modernization, explicitly not done
+
+1. **D-13 `WebSecurityConfigurerAdapter` → `SecurityFilterChain`.** Boot
+   `2.3.12` pins Spring Security `5.3.9`; `SecurityFilterChain` beans need
+   `5.4+`. The adapter is deprecated in `5.7` and removed in `6.0`, so this is
+   forced work — but it is Stage 4 work, and bumping Spring Security here to
+   make it fit would violate the stage ladder. The resource servers therefore
+   still extend `WebSecurityConfigurerAdapter`, now with the lambda DSL.
+2. **Spring Authorization Server.** Requires Spring Security `5.5.2+`; same
+   constraint. `auth-service` keeps `spring-security-oauth2` for the
+   authorization-server role only, and now issues JWTs from it. The full swap is
+   Stage 4/5.
+3. **Ribbon inside the services.** D-06 removed Ribbon from the *edge*.
+   `account-service` and `notification-service` still resolve Feign clients
+   through Ribbon (visible as `DynamicServerListLoadBalancer` in their logs),
+   because `spring-cloud-starter-openfeign` on Hoxton defaults to it. Moving
+   service-to-service calls onto Spring Cloud LoadBalancer belongs with the
+   Spring Cloud 2021.0 bump.
+4. **The Feign builder adapter** in §1 must be deleted with Sleuth.
+5. **A persistent signing key.** Without `SECURITY_JWT_PRIVATE_KEY`,
+   `auth-service` generates an ephemeral RSA pair per boot and logs a warning,
+   so every restart invalidates outstanding tokens and multiple instances cannot
+   validate each other's tokens. Acceptable for the demo stack and for CI; a
+   real deployment needs a provisioned key. No key material is committed.
+
+## 7. Per-unit results
+
+T0 after integration, at `685eb55`, full log `/home/ubuntu/stage3/t0-after.log`:
+
+| Module | `mvn -B -fae verify` | Tests | Failures | Errors | Skipped |
+| --- | --- | ---: | ---: | ---: | ---: |
+| piggymetrics (pom) | SUCCESS | — | — | — | — |
+| config | SUCCESS | 0 | 0 | 0 | 0 |
+| registry | SUCCESS | 0 | 0 | 0 | 0 |
+| gateway | SUCCESS | 2 | 0 | 0 | 0 |
+| auth-service | SUCCESS | 9 | 0 | 0 | 0 |
+| account-service | SUCCESS | 14 | 0 | 0 | 0 |
+| statistics-service | SUCCESS | 16 | 0 | 0 | 0 |
+| notification-service | SUCCESS | 18 | 0 | 0 | 0 |
+| **Total** | **BUILD SUCCESS** | **59** | **0** | **0** | **0** |
+
+Per-class counts are unchanged from `BASELINE.md` §2, including
+`StatisticsServiceClientFallbackTest=1`, which now exercises the Resilience4j
+fallback rather than the Hystrix one.
+
+T1 after integration: `/home/ubuntu/stage3/t1-after.txt` compared as text
+against the Stage 1 oracle `/home/ubuntu/stage1/t1-after.txt`. The only
+difference is the ambient date in the rates stub (`2026-09-10` → `2026-09-11`);
+with that normalized the two files are identical, so `0.0330`, `0.6800`,
+`"USD":1`, `"JPY":147.85`, `2.2341` and the `+0000` date form all survive the
+JWT, Gateway and Resilience4j rewrites.
+
+The D-05 fallback was proved by killing `statistics-service` and repeating the
+account update: three PUTs returned 200 in under 20 ms each, the note persisted,
+and `StatisticsServiceClientFallback` logged once per call
+(`/home/ubuntu/stage3/fallback-proof.txt`). Without the builder adapter of §1
+those calls would have propagated a 500 instead.
+
+Route and security matrix, `/home/ubuntu/stage3/route-security-after.txt`:
+
+```text
+GET /            (static UI via gateway)       200
+GET /accounts/current                          200
+GET /statistics/current                        200
+GET /notifications/recipients/current          200
+GET /uaa/users/current                         200
+GET /rates/latest?base=USD (StripPrefix=1)     200
+GET /ACCOUNT-SERVICE/accounts/current          404
+GET /accounts/current  no token                401
+GET /accounts/current  garbage token           401
+GET /statistics/current no token               401
+GET /notifications/recipients/current none     401
+GET /accounts/demo     permitAll               200
+GET /statistics/demo   permitAll               401   (row 5 of §3)
+POST /accounts/        permitAll (dup user)     400
+PUT  /statistics/{user} with ui-scope token     403
+```
+
+The issued token was 578 characters with two dots — a three-part JWT, not the
+36-character opaque UUID of the baseline. `smoke.sh` printed
+`Smoke test passed` (`/home/ubuntu/stage3/smoke-after.log`).
+
+## 8. The warm-up window, and why the first capture was empty
+
+The first post-integration T1 capture returned `[]` for `/statistics/current`.
+The cause is in `/home/ubuntu/stage3/account-debug2.log`:
+
+```text
+TimeLimiter 'StatisticsServiceClient#updateStatistics(String,Account)' recorded an error:
+'java.lang.RuntimeException: com.netflix.client.ClientException:
+ Load balancer does not have available server for client: statistics-service'
+```
+
+For the first ~30-60s after boot, account-service's Ribbon server list for
+`statistics-service` is still empty, the call fails, and the fallback fires —
+which is the fallback working, and is the same window that produced
+`/home/ubuntu/stage2/artifacts/gm-before-initial-empty-stats.txt` at the Stage 2
+baseline with Hystrix. It is a harness artifact, not a Stage 3 difference.
+`/home/ubuntu/stage3/warm-probe.sh` now polls the account → statistics chain
+until it is live so captures land outside that window; it warmed on the first
+attempt for the recorded run.
+
+## 9. Playbook pointer and remaining gaps
+
+The Stage 3 delegated procedure is `docs/modernization/PLAYBOOK.md`, section
+`# Stage 3 playbook — Netflix and OAuth2 retirement (D-03…D-07, D-18, D-24)`.
+
+Remaining gaps after Stage 3:
+
+1. The five deferrals in §6, all of which land in Stage 4/5.
+2. D-17, held back deliberately per §5.
+3. No test covers the Feign circuit-breaker wiring itself: `T0` passes whether
+   or not the builder adapter is present, which is precisely how the silent
+   fallback loss could have shipped. The runtime fallback probe is the only
+   guard, and it lives in the PR rather than the suite.
+4. Browser-test evidence lives in the PR, as in earlier stages. The integrated
+   golden path was driven end to end at `685eb55`: signup, two-stage login,
+   modal edits (Salary 1000 USD/month, Tokyo 14785 JPY/month), savings cycling
+   USD 100 → RUB 9250 → EUR 92 → USD 100, finite charts, persistence across a
+   full reload and re-login, and the read-only demo account. No console errors.

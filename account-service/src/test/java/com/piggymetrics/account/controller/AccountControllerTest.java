@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableList;
 import com.piggymetrics.account.domain.*;
 import com.piggymetrics.account.service.AccountService;
-import com.sun.security.auth.UserPrincipal;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -12,6 +11,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -66,7 +66,7 @@ public class AccountControllerTest {
 
 		when(accountService.findByName(account.getName())).thenReturn(account);
 
-		mockMvc.perform(get("/current").principal(new UserPrincipal(account.getName())))
+		mockMvc.perform(get("/current").principal(new UsernamePasswordAuthenticationToken(account.getName(), null)))
 				.andExpect(jsonPath("$.name").value(account.getName()))
 				.andExpect(status().isOk());
 	}
@@ -105,7 +105,7 @@ public class AccountControllerTest {
 
 		String json = mapper.writeValueAsString(account);
 
-		mockMvc.perform(put("/current").principal(new UserPrincipal(account.getName())).contentType(MediaType.APPLICATION_JSON).content(json))
+		mockMvc.perform(put("/current").principal(new UsernamePasswordAuthenticationToken(account.getName(), null)).contentType(MediaType.APPLICATION_JSON).content(json))
 				.andExpect(status().isOk());
 	}
 
@@ -117,7 +117,7 @@ public class AccountControllerTest {
 
 		String json = mapper.writeValueAsString(account);
 
-		mockMvc.perform(put("/current").principal(new UserPrincipal(account.getName())).contentType(MediaType.APPLICATION_JSON).content(json))
+		mockMvc.perform(put("/current").principal(new UsernamePasswordAuthenticationToken(account.getName(), null)).contentType(MediaType.APPLICATION_JSON).content(json))
 				.andExpect(status().isBadRequest());
 	}
 
@@ -130,7 +130,7 @@ public class AccountControllerTest {
 
 		String json = mapper.writeValueAsString(user);
 		System.out.println(json);
-		mockMvc.perform(post("/").principal(new UserPrincipal("test")).contentType(MediaType.APPLICATION_JSON).content(json))
+		mockMvc.perform(post("/").principal(new UsernamePasswordAuthenticationToken("test", null)).contentType(MediaType.APPLICATION_JSON).content(json))
 				.andExpect(status().isOk());
 	}
 
@@ -142,7 +142,7 @@ public class AccountControllerTest {
 
 		String json = mapper.writeValueAsString(user);
 
-		mockMvc.perform(post("/").principal(new UserPrincipal("test")).contentType(MediaType.APPLICATION_JSON).content(json))
+		mockMvc.perform(post("/").principal(new UsernamePasswordAuthenticationToken("test", null)).contentType(MediaType.APPLICATION_JSON).content(json))
 				.andExpect(status().isBadRequest());
 	}
 }
