@@ -6,40 +6,37 @@ hystrix:
           thread:
             timeoutInMilliseconds: 20000
 
-ribbon:
-  ReadTimeout: 20000
-  ConnectTimeout: 20000
+spring:
+  cloud:
+    gateway:
+      discovery:
+        locator:
+          enabled: false
 
-zuul:
-  ignoredServices: '*'
-  host:
-    connect-timeout-millis: 20000
-    socket-timeout-millis: 20000
+      httpclient:
+        connect-timeout: 20000
+        response-timeout: 20s
 
-  routes:
-    auth-service:
-        path: /uaa/**
-        url: http://auth-service:5000
-        stripPrefix: false
-        sensitiveHeaders:
+      routes:
+        - id: auth-service
+          uri: http://auth-service:5000
+          predicates:
+            - Path=/uaa/**
 
-    account-service:
-        path: /accounts/**
-        serviceId: account-service
-        stripPrefix: false
-        sensitiveHeaders:
+        - id: account-service
+          uri: lb://account-service
+          predicates:
+            - Path=/accounts/**
 
-    statistics-service:
-        path: /statistics/**
-        serviceId: statistics-service
-        stripPrefix: false
-        sensitiveHeaders:
+        - id: statistics-service
+          uri: lb://statistics-service
+          predicates:
+            - Path=/statistics/**
 
-    notification-service:
-        path: /notifications/**
-        serviceId: notification-service
-        stripPrefix: false
-        sensitiveHeaders:
+        - id: notification-service
+          uri: lb://notification-service
+          predicates:
+            - Path=/notifications/**
 
 server:
   port: 4000
