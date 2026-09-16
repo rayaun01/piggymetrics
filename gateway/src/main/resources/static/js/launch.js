@@ -74,7 +74,7 @@ function getCurrentAccount() {
 	return account;
 }
 
-$(window).load(function(){
+$(window).on("load", function(){
 
 	if(/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ) {
 		FastClick.attach(document.body);
@@ -99,7 +99,7 @@ $(window).load(function(){
 function showGreetingPage(account) {
     initAccount(account);
 	var userAvatar = $("<img />").attr("src","images/userpic.jpg");
-	$(userAvatar).load(function() {
+	$(userAvatar).on("load", function() {
 		setTimeout(initGreetingPage, 500);
 	});
 }

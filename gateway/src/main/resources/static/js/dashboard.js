@@ -588,7 +588,7 @@ $("#outermaindiv, #incomes-cursor, #expense-cursor, .lines-title").click(functio
 	$("#line-0, #line-100").addClass("activeline");
 });
 
-$("#expenses-lines-container, #incomes-lines-container").on("hover", ".itemline", function() {
+$("#expenses-lines-container, #incomes-lines-container").on("mouseenter mouseleave", ".itemline", function() {
 	$(".itemline").removeClass("activeline");
 	$(this).addClass("activeline");
 });
