@@ -772,7 +772,7 @@ $(".notes-save").click(function() {
 });
 
 // Bubble animation
-$("#bubble").bind("hover",  function() {
+$("#bubble").on("mouseenter mouseleave",  function() {
     $("#indicator").toggleClass("bubble-animation");
 });
 
