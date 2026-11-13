@@ -2832,16 +2832,13 @@ only screen and (min-resolution: 144dpi) {
 
 /* =============== MULTIPLE SAVINGS =============== */
 #savingsheader {
-	display: none;
 	position: relative;
 	height: 62px;
-	border-bottom: 1px solid #e2e2e2;
 }
-#savingsheader .savingstitle14 { left: 25px; top: 18px; }
-#savingsheader .savingstitle12 { left: 25px; top: 38px; position: absolute; }
+#savingsheader span { display: none; }
 #savingslist {
 	position: relative;
-	height: 330px;
+	height: 268px;
 	overflow-y: auto;
 	text-transform: none;
 }
