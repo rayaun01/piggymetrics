@@ -19,6 +19,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.Date;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -63,13 +64,15 @@ public class StatisticsServiceImpl implements StatisticsService {
 				.map(this::createItemMetric)
 				.collect(Collectors.toSet());
 
-		Map<StatisticMetric, BigDecimal> statistics = createStatisticMetrics(incomes, expenses, account.getSaving());
+		Map<String, BigDecimal> savingBreakdown = createSavingBreakdown(account.getSavings());
+		Map<StatisticMetric, BigDecimal> statistics = createStatisticMetrics(incomes, expenses, savingBreakdown);
 
 		DataPoint dataPoint = new DataPoint();
 		dataPoint.setId(pointId);
 		dataPoint.setIncomes(incomes);
 		dataPoint.setExpenses(expenses);
 		dataPoint.setStatistics(statistics);
+		dataPoint.setSavingBreakdown(savingBreakdown);
 		dataPoint.setRates(ratesService.getCurrentRates());
 
 		log.debug("new datapoint has been created: {}", pointId);
@@ -77,9 +80,10 @@ public class StatisticsServiceImpl implements StatisticsService {
 		return repository.save(dataPoint);
 	}
 
-	private Map<StatisticMetric, BigDecimal> createStatisticMetrics(Set<ItemMetric> incomes, Set<ItemMetric> expenses, Saving saving) {
+	private Map<StatisticMetric, BigDecimal> createStatisticMetrics(Set<ItemMetric> incomes, Set<ItemMetric> expenses, Map<String, BigDecimal> savingBreakdown) {
 
-		BigDecimal savingAmount = ratesService.convert(saving.getCurrency(), Currency.getBase(), saving.getAmount());
+		BigDecimal savingAmount = savingBreakdown.values().stream()
+				.reduce(BigDecimal.ZERO, BigDecimal::add);
 
 		BigDecimal expensesAmount = expenses.stream()
 				.map(ItemMetric::getAmount)
@@ -94,6 +98,23 @@ public class StatisticsServiceImpl implements StatisticsService {
 				StatisticMetric.INCOMES_AMOUNT, incomesAmount,
 				StatisticMetric.SAVING_AMOUNT, savingAmount
 		);
+	}
+
+	/**
+	 * Converts every saving to {@link Currency#getBase()} currency, keyed by saving id
+	 */
+	private Map<String, BigDecimal> createSavingBreakdown(List<Saving> savings) {
+
+		Map<String, BigDecimal> breakdown = new LinkedHashMap<>();
+
+		for (int i = 0; i < savings.size(); i++) {
+			Saving saving = savings.get(i);
+			String key = saving.getId() != null ? saving.getId() : "saving-" + i;
+			BigDecimal amount = ratesService.convert(saving.getCurrency(), Currency.getBase(), saving.getAmount());
+			breakdown.merge(key, amount, BigDecimal::add);
+		}
+
+		return breakdown;
 	}
 
 	/**

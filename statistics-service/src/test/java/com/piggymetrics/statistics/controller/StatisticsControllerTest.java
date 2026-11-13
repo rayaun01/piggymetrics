@@ -107,7 +107,7 @@ public class StatisticsControllerTest {
 		salary.setPeriod(TimePeriod.MONTH);
 
 		final Account account = new Account();
-		account.setSaving(saving);
+		account.setSavings(ImmutableList.of(saving));
 		account.setExpenses(ImmutableList.of(grocery));
 		account.setIncomes(ImmutableList.of(salary));
 
@@ -117,5 +117,25 @@ public class StatisticsControllerTest {
 				.andExpect(status().isOk());
 
 		verify(statisticsService, times(1)).save(anyString(), any(Account.class));
+	}
+
+	@Test
+	public void shouldAcceptLegacySingleSavingPayload() throws Exception {
+
+		String json = "{\"incomes\":[],\"expenses\":[],"
+				+ "\"saving\":{\"amount\":100,\"currency\":\"USD\",\"interest\":1,\"deposit\":false,\"capitalization\":false}}";
+
+		mockMvc.perform(put("/test").contentType(MediaType.APPLICATION_JSON).content(json))
+				.andExpect(status().isOk());
+
+		verify(statisticsService).save(org.mockito.ArgumentMatchers.eq("test"), org.mockito.ArgumentMatchers.argThat(account ->
+				account.getSavings().size() == 1 && Saving.PRIMARY_ID.equals(account.getSavings().get(0).getId())));
+	}
+
+	@Test
+	public void shouldFailOnValidationWhenSavingsAreMissing() throws Exception {
+
+		mockMvc.perform(put("/test").contentType(MediaType.APPLICATION_JSON).content("{\"incomes\":[],\"expenses\":[]}"))
+				.andExpect(status().isBadRequest());
 	}
 }

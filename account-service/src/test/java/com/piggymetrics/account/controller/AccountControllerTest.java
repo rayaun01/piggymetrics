@@ -19,6 +19,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import java.math.BigDecimal;
 import java.util.Date;
 
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.MockitoAnnotations.initMocks;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -99,7 +100,7 @@ public class AccountControllerTest {
 		account.setName("test");
 		account.setNote("test note");
 		account.setLastSeen(new Date());
-		account.setSaving(saving);
+		account.setSavings(ImmutableList.of(saving));
 		account.setExpenses(ImmutableList.of(grocery));
 		account.setIncomes(ImmutableList.of(salary));
 
@@ -144,5 +145,45 @@ public class AccountControllerTest {
 
 		mockMvc.perform(post("/").principal(new UserPrincipal("test")).contentType(MediaType.APPLICATION_JSON).content(json))
 				.andExpect(status().isBadRequest());
+	}
+
+	@Test
+	public void shouldAcceptLegacySingleSavingPayload() throws Exception {
+
+		String json = "{\"incomes\":[],\"expenses\":[],"
+				+ "\"saving\":{\"amount\":100,\"currency\":\"USD\",\"interest\":1,\"deposit\":true,\"capitalization\":false}}";
+
+		mockMvc.perform(put("/current").principal(new UserPrincipal("test")).contentType(MediaType.APPLICATION_JSON).content(json))
+				.andExpect(status().isOk());
+
+		verify(accountService).saveChanges(org.mockito.ArgumentMatchers.eq("test"), org.mockito.ArgumentMatchers.argThat(account ->
+				account.getSavings().size() == 1
+						&& Saving.PRIMARY_ID.equals(account.getSavings().get(0).getId())
+						&& account.getSavings().get(0).getType() == SavingType.DEPOSIT));
+	}
+
+	@Test
+	public void shouldFailOnValidationWhenSweepRuleIsIncomplete() throws Exception {
+
+		String json = "{\"savings\":[{\"id\":\"a\",\"amount\":1,\"currency\":\"USD\",\"interest\":0,\"deposit\":false,\"capitalization\":false}],"
+				+ "\"sweepRules\":[{\"sourceSavingId\":\"a\"}]}";
+
+		mockMvc.perform(put("/current").principal(new UserPrincipal("test")).contentType(MediaType.APPLICATION_JSON).content(json))
+				.andExpect(status().isBadRequest());
+	}
+
+	@Test
+	public void shouldGetSavingsProjection() throws Exception {
+
+		SavingProjection projection = new SavingProjection();
+		projection.setSavingId("primary");
+		projection.setBalances(ImmutableList.of(new BigDecimal("101.0000")));
+
+		when(accountService.getSavingsProjection("test", 1)).thenReturn(ImmutableList.of(projection));
+
+		mockMvc.perform(get("/test/savings/projection?months=1"))
+				.andExpect(jsonPath("$[0].savingId").value("primary"))
+				.andExpect(jsonPath("$[0].balances[0]").value(101.0))
+				.andExpect(status().isOk());
 	}
 }

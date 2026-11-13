@@ -1,11 +1,12 @@
 var user = {},
-    savings = {},
+    savingsList = [],
+    sweepRules = [],
     incomes = {},
     expenses = {};
 
 function initAccount(account) {
-    user = new User(account.name, account.lastSeen, account.saving.currency, account.note);
-    savings = new Savings (account.saving.amount, account.saving.deposit, account.saving.capitalization, account.saving.interest);
+    setSavings(account);
+    user = new User(account.name, account.lastSeen, primarySaving().currency, account.note);
 
     if (account.incomes) {
         for (i = 0; i < account.incomes.length; i++) {
@@ -32,11 +33,46 @@ function User(username, lastSeen, currency, note) {
     this.notes = note;
 }
 
-function Savings(money, deposit, capitalization, interest) {
-    this.freeMoney = money;
-    this.deposit = deposit;
-    this.capitalization = capitalization;
-    this.percent = interest;
+var SAVING_TYPES = ["CHECKING", "GOAL", "DEPOSIT"],
+    SAVING_CURRENCIES = ["USD", "EUR", "RUB", "JPY"],
+    SWEEP_MODES = {FIXED_AMOUNT: "Fixed amount", PERCENT_OF_SURPLUS: "% of surplus", THRESHOLD_EXCESS: "Excess over"},
+    SWEEP_FREQUENCIES = ["MONTHLY", "WEEKLY"];
+
+function setSavings(account) {
+    var accountSavings = account.savings || (account.saving ? [account.saving] : []);
+    savingsList = $.map(accountSavings, function(s, i) {
+        return [{
+            id: s.id || (i === 0 ? "primary" : newClientId("saving")),
+            name: s.name || "Savings",
+            type: s.type || (s.deposit ? "DEPOSIT" : "CHECKING"),
+            amount: Number(s.amount) || 0,
+            currency: s.currency || "USD",
+            interest: Number(s.interest) || 0,
+            deposit: !!s.deposit,
+            capitalization: !!s.capitalization
+        }];
+    });
+    if (savingsList.length === 0) {
+        savingsList.push(newSaving("Checking", "CHECKING"));
+    }
+    sweepRules = $.map(account.sweepRules || [], function(r) {
+        return [{id: r.id, sourceSavingId: r.sourceSavingId, targetSavingId: r.targetSavingId, mode: r.mode, value: Number(r.value), frequency: r.frequency || "MONTHLY"}];
+    });
+}
+
+function primarySaving() {
+    for (var i = 0; i < savingsList.length; i++) {
+        if (savingsList[i].type === "CHECKING") return savingsList[i];
+    }
+    return savingsList[0];
+}
+
+function newClientId(prefix) {
+    return prefix + "-" + Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36);
+}
+
+function newSaving(name, type) {
+    return {id: newClientId("saving"), name: name, type: type, amount: 0, currency: user.checkedCurr || "USD", interest: 0, deposit: type === "DEPOSIT", capitalization: false};
 }
 
 function AddIncome(income_id, title, icon, currency, period, amount){
@@ -114,9 +150,7 @@ function initGreetingPage() {
     getConverted(expenses);
 
     initStatisticPage();
-    setTimeout(function() { initSavingsCircles(user.checkedPercent, 0.2, savings.freeMoney, savings.freeMoney, 700) }, 200);
-    initSavingsSlider();
-    $("#savings-slider").data({"checkedPercent": user.checkedPercent});
+    loadSavingsProjection(700);
 
     $("#lefttitle").prepend(escape(user.login));
     $("#righttitle").append(user.lastSeen);
@@ -128,17 +162,6 @@ function initGreetingPage() {
 }
 
 function initSettingsPage() {
-    switch (user.checkedCurr) {
-        case "RUB": $("#rublesign").show().css({"background-position": "-150px 0"});
-            break;
-        case "EUR": $("#rublesign").show().css({"background-position": "-386px 0"});
-            break;
-        case "USD": $("#rublesign").show().css({"background-position": "-354px 0"});
-            break;
-        case "JPY": $("#rublesign").hide();
-            break;
-    }
-
     $("#settings_hat").show();
     $("#avatarcontainer").addClass("reverse");
     $("#overlay, .modal-content").show(); // Fix transition and visibility: hidden Chrome issue
@@ -191,19 +214,94 @@ function addNotes() {
 
 // Filling Savings column
 function addSavings() {
-    switch (savings.deposit) {
-        case true: $("#deposit").prop('checked', true);
-            break;
+    renderSavingsList();
+}
+
+function optionsHtml(values, selected, labels) {
+    return $.map(values, function(value) {
+        return '<option value="' + value + '"' + (value === selected ? ' selected' : '') + '>' + escape(labels ? labels[value] : value) + '</option>';
+    }).join("");
+}
+
+function renderSavingsList() {
+    var html = $.map(savingsList, function(s) {
+        return '<div class="saving-card' + (s.deposit ? ' saving-deposit-on' : '') + '" data-id="' + escape(s.id) + '">'
+            + '<input type="text" class="saving-name" maxlength="20" value="' + escape(s.name) + '" aria-label="Saving name">'
+            + '<select class="saving-type" aria-label="Saving type">' + optionsHtml(SAVING_TYPES, s.type) + '</select>'
+            + '<div class="saving-remove" title="Remove saving">&times;</div>'
+            + '<input type="number" class="saving-amount" min="0" step="0.01" value="' + s.amount + '" aria-label="Amount">'
+            + '<select class="saving-currency" aria-label="Currency">' + optionsHtml(SAVING_CURRENCIES, s.currency) + '</select>'
+            + '<label class="saving-flag"><input type="checkbox" class="saving-deposit"' + (s.deposit ? ' checked' : '') + '> Interest</label>'
+            + '<input type="number" class="saving-interest" min="0" max="99.99" step="0.01" value="' + s.interest + '"' + (s.deposit ? '' : ' disabled') + ' aria-label="Annual interest"> %'
+            + '<label class="saving-flag"><input type="checkbox" class="saving-capitalization"' + (s.capitalization ? ' checked' : '') + (s.deposit ? '' : ' disabled') + '> Monthly capitalization</label>'
+            + '</div>';
+    }).join("");
+    $("#savingslist").html(html);
+    $("#sweepscount").text(sweepRules.length ? "(" + sweepRules.length + ")" : "");
+}
+
+// Reads the savings column back into savingsList
+function readSavingsList() {
+    savingsList = $("#savingslist .saving-card").map(function() {
+        var card = $(this),
+            deposit = card.find(".saving-deposit").prop("checked");
+        return {
+            id: card.data("id").toString(),
+            name: $.trim(card.find(".saving-name").val()).substring(0, 20) || "Savings",
+            type: card.find(".saving-type").val(),
+            amount: Math.max(0, Math.round((parseFloat(card.find(".saving-amount").val()) || 0) * 100) / 100),
+            currency: card.find(".saving-currency").val(),
+            interest: deposit ? Math.min(99.99, Math.max(0, parseFloat(card.find(".saving-interest").val()) || 0)) : 0,
+            deposit: deposit,
+            capitalization: deposit && card.find(".saving-capitalization").prop("checked")
+        };
+    }).get();
+    var ids = $.map(savingsList, function(s) { return s.id; });
+    sweepRules = $.grep(sweepRules, function(r) {
+        return $.inArray(r.sourceSavingId, ids) >= 0 && $.inArray(r.targetSavingId, ids) >= 0;
+    });
+}
+
+function renderSweepList() {
+    var savingIds = $.map(savingsList, function(s) { return s.id; }),
+        savingNames = {};
+    $.each(savingsList, function(i, s) { savingNames[s.id] = s.name; });
+
+    var html = $.map(sweepRules, function(r) {
+        return '<div class="sweep-row" data-id="' + escape(r.id || "") + '">'
+            + '<select class="sweep-source" aria-label="Source saving">' + optionsHtml(savingIds, r.sourceSavingId, savingNames) + '</select>'
+            + '<span class="sweep-arrow">&rarr;</span>'
+            + '<select class="sweep-target" aria-label="Target saving">' + optionsHtml(savingIds, r.targetSavingId, savingNames) + '</select>'
+            + '<div class="saving-remove sweep-remove" title="Remove rule">&times;</div>'
+            + '<select class="sweep-mode" aria-label="Mode">' + optionsHtml(Object.keys(SWEEP_MODES), r.mode, SWEEP_MODES) + '</select>'
+            + '<input type="number" class="sweep-value" min="0" step="0.01" value="' + r.value + '" aria-label="Value">'
+            + '<select class="sweep-frequency" aria-label="Frequency">' + optionsHtml(SWEEP_FREQUENCIES, r.frequency) + '</select>'
+            + '</div>';
+    }).join("");
+    $("#sweeplist").html(html || '<div class="sweeps-empty">No rules yet</div>');
+    $("#addsweep").toggle(savingsList.length > 1);
+}
+
+// Returns an error message, or null when every rule is valid
+function readSweepList() {
+    var rules = $("#sweeplist .sweep-row").map(function() {
+        var row = $(this);
+        return {
+            id: row.data("id") ? row.data("id").toString() : null,
+            sourceSavingId: row.find(".sweep-source").val(),
+            targetSavingId: row.find(".sweep-target").val(),
+            mode: row.find(".sweep-mode").val(),
+            value: parseFloat(row.find(".sweep-value").val()),
+            frequency: row.find(".sweep-frequency").val()
+        };
+    }).get();
+    for (var i = 0; i < rules.length; i++) {
+        if (rules[i].sourceSavingId === rules[i].targetSavingId) return "Rule " + (i + 1) + ": source and target must differ";
+        if (isNaN(rules[i].value) || rules[i].value < 0) return "Rule " + (i + 1) + ": value must be zero or positive";
+        if (rules[i].mode === "PERCENT_OF_SURPLUS" && rules[i].value > 100) return "Rule " + (i + 1) + ": percent must not exceed 100";
     }
-    switch (savings.capitalization) {
-        case true: $("#capitalization").prop('checked', true);
-            break;
-    }
-    $("#savingsvalue").val(savings.freeMoney);
-    $("#percentvalue").val(savings.percent);
-    $("#savingsvalue").autoNumeric("init");
-    $("#percentvalue").autoNumeric("init");
-    moveRuble();
+    sweepRules = rules;
+    return null;
 }
 
 // Filling Incomes and Expenses columns
@@ -589,7 +687,7 @@ $(".initicons").click(function() {
 // MODAL: Turn off modal/notes window and reset all forms
 $("#overlay, .modal-close").click(turnOffModal);
 function turnOffModal() {
-    $("#overlay, #add-modal, #add-notes").removeClass("modal-show");
+    $("#overlay, #add-modal, #add-notes, #add-sweeps").removeClass("modal-show");
     $(".modalincomessurface, .modalexpensessurface").fadeOut(150);
     setTimeout(function() { $(".modalvalue").val('0').hide(); $(".modaltitle").val('').hide(); $(".modal-delete").hide(); $("textarea#notes").val(user.notes).hide(); }, 200);
 }
@@ -689,73 +787,60 @@ $('#incomewrapper').bind('DOMMouseScroll mousewheel', function (e){
     return false;
 });
 
-// SAVINGS: Click on toggles
-$("#deposit").click(function() {
-    if ($("#deposit").prop('checked') == false) {
-        $("#capitalization").prop('disabled', true);
-        $("#percentvalue").prop('disabled', true);
-        $("#capitalization").prop('checked', false);
+// SAVINGS: list editing
+$("#savingslist").on("change", ".saving-deposit", function() {
+    var card = $(this).closest(".saving-card"),
+        on = $(this).prop("checked");
+    card.toggleClass("saving-deposit-on", on);
+    card.find(".saving-interest, .saving-capitalization").prop("disabled", !on);
+    if (!on) card.find(".saving-capitalization").prop("checked", false);
+}).on("click", ".saving-remove", function() {
+    if ($("#savingslist .saving-card").length <= 1) {
+        alert("At least one saving is required");
+        return;
     }
-    else {
-        $("#capitalization").prop('disabled', false);
-        $("#percentvalue").prop('disabled', false);
-    }
+    $(this).closest(".saving-card").remove();
+    readSavingsList();
+    renderSavingsList();
+}).on("keyup", "input", function(e) {
+    if (e.which == 13) this.blur();
+}).on("DOMMouseScroll mousewheel", function(e) {
+    // let the list scroll instead of switching pages
+    e.stopPropagation();
 });
-// SAVINGS: Moving ruble sign according to input value length
-$("#savingsvalue").bind("keyup keydown keypress select click", function() {savings.freeMoney = $("#savingsvalue").autoNumeric("get"); moveRuble();}).keyup(function(e) { if (e.which == 13) {	this.blur() } });
-function moveRuble() {
-    var length=$("#savingsvalue").val().length;
-    length = (length<2)? 1: length;
-    $("#savingsvalue").attr('size', length);
-    if (length > 9) {
-        $("#savingsvalue").css({"font-size": "31px"});
-        $("#rublesign").css({"left": (length*15 + 17) + "px", "top": "115px"});
-    }
-    else if (length > 7 ) {
-        $("#savingsvalue").css({"font-size": "38px"});
-        $("#rublesign").css({"left": (length*18 + 18) + "px", "top": "120px"});
-    }
-    else {
-        $("#savingsvalue").css({"font-size": "44px"});
-        $("#rublesign").css({"left": (length*22 + 20) + "px", "top": "125px"});
-    }
-}
-
-//SAVINGS: change currency on sign click
-$("#rublesign").on("click", function() {
-    switch (user.checkedCurr) {
-        case "RUB": user.checkedCurr = "EUR"; $("#rublesign").css({"background-position": "-386px 0"});
-            break;
-        case "EUR": user.checkedCurr = "USD"; $("#rublesign").css({"background-position": "-354px 0"});
-            break;
-        case "USD": user.checkedCurr = "RUB"; $("#rublesign").css({"background-position": "-150px 0"});
-            break;
-    }
-    changeCurrency();
-    $("#savingsvalue").autoNumeric('set', Math.round (savings.freeMoney) );
-    moveRuble();
-    // Update savings slider
-    $('#savings-slider').noUiSlider({
-        start: (incomesSumMonth-expensesSumMonth) * $("#savings-slider").data("checkedPercent"),
-        step: (incomesSumMonth-expensesSumMonth) / 20,
-        range: {
-            'min': [ 0 ],
-            'max': [ incomesSumMonth-expensesSumMonth ]
-        }
-    }, true);
-    runConvert();
+$("#addsaving").on("click", function() {
+    readSavingsList();
+    savingsList.push(newSaving("Goal " + savingsList.length, "GOAL"));
+    renderSavingsList();
+    $("#savingslist").scrollTop($("#savingslist")[0].scrollHeight);
 });
 
-// SAVINGS: Set zero when input is empty
-$("#savingsvalue").bind("blur", function() {
-    if (this.value.length == 0) {
-        $("#savingsvalue").val("0");
-    }
+// SWEEPS: rules window
+$("#sweepsbutton").on("click", function() {
+    readSavingsList();
+    renderSweepList();
+    $("#overlay, #add-sweeps").addClass("modal-show");
 });
-$("#percentvalue").keyup(function(e) { if(e.which == 13) {	this.blur() } }).bind("blur", function() {
-    if (this.value == " %") {
-        $("#percentvalue").val("0 %");
+$("#addsweep").on("click", function() {
+    readSweepList();
+    var source = primarySaving(),
+        target = $.grep(savingsList, function(s) { return s.id !== source.id; })[0];
+    sweepRules.push({id: null, sourceSavingId: source.id, targetSavingId: target.id, mode: "THRESHOLD_EXCESS", value: 1000, frequency: "MONTHLY"});
+    renderSweepList();
+});
+$("#sweeplist").on("click", ".sweep-remove", function() {
+    $(this).closest(".sweep-row").remove();
+    if ($("#sweeplist .sweep-row").length === 0) renderSweepList();
+});
+$(".sweeps-save").click(function() {
+    var error = readSweepList();
+    if (error) {
+        alert(error);
+        return;
     }
+    renderSavingsList();
+    turnOffModal();
+    jsonDataSave();
 });
 
 // NOTES: call window
@@ -839,37 +924,27 @@ function launchStatistic() {
 
         $(".bottompage").css({"display": "block"});
 
-        // Fill objects form Savings fields
-        savings.percent = $("#percentvalue").autoNumeric("get");
-        savings.deposit = $("#deposit").prop("checked");
-        savings.capitalization = $("#capitalization").prop("checked");
+        readSavingsList();
 
         // Launch 4 page
         $("#lastlogoflipper").addClass("flippedcard");
         initStatisticPage();
-        setTimeout(function() { initSavingsCircles(user.checkedPercent, 0.2, savings.freeMoney, savings.freeMoney, 700) }, 1600);
         setTimeout(function() { $(".toppage, .bottompage").addClass("sectionDown"); }, 400);
-
-        // Update savings slider
-        $('#savings-slider').noUiSlider({
-            start: (incomesSumMonth-expensesSumMonth) * $("#savings-slider").data("checkedPercent"),
-            step: (incomesSumMonth-expensesSumMonth) / 20,
-            range: {
-                'min': [ 0 ],
-                'max': [Math.abs(incomesSumMonth-expensesSumMonth)]
-            }
-        }, true);
 
     }
     else {
         alert("Please, add at least one item for each column")
     }
 
-    jsonDataSave();
+    if (global.savePermit) {
+        jsonDataSave(function() { loadSavingsProjection(700); });
+    } else {
+        setTimeout(function() { loadSavingsProjection(700); }, 1600);
+    }
 
 }
 
-function jsonDataSave() {
+function jsonDataSave(onSaved) {
     if (global.savePermit) {
         $.ajax({
             url: 'accounts/current',
@@ -881,19 +956,21 @@ function jsonDataSave() {
                 note: user.notes,
                 incomes: $.map(incomes, function(value) {return [value]}),
                 expenses: $.map(expenses, function(value) {return [value]}),
-                saving: {
-                    amount: Math.ceil(savings.freeMoney),
-                    capitalization: savings.capitalization,
-                    deposit: savings.deposit,
-                    currency: user.checkedCurr,
-                    interest: savings.percent
-                }
+                savings: savingsList,
+                sweepRules: sweepRules
             }),
             success: function () {
                 $("#leftborder, #rightborder, #centerborder").addClass("saveaction");
                 setTimeout(function() {
                     $("#leftborder, #rightborder, #centerborder").removeClass("saveaction");
                 }, 400);
+                // sweeps run on the server while saving, so pick up the adjusted balances
+                var saved = getCurrentAccount();
+                if (saved) {
+                    setSavings(saved);
+                    renderSavingsList();
+                }
+                if (onSaved) onSaved();
             },
             error: function () {
                 alert("An error during data saving. Please, try again later");
@@ -904,18 +981,7 @@ function jsonDataSave() {
 
 function fadeStatistic() {
 
-    switch (user.checkedCurr) {
-        case "RUB": $("#rublesign").show().css({"background-position": "-150px 0"});
-            break;
-        case "EUR": $("#rublesign").show().css({"background-position": "-386px 0"});
-            break;
-        case "USD": $("#rublesign").show().css({"background-position": "-354px 0"});
-            break;
-        case "JPY": $("#rublesign").hide();
-            break;
-    }
-    $("#savingsvalue").autoNumeric('set', savings.freeMoney);
-    moveRuble();
+    renderSavingsList();
 
     $(".toppage, .bottompage").removeClass("sectionDown");
     setTimeout(function() { $("#lastlogoflipper").removeClass("flippedcard"); }, 220);

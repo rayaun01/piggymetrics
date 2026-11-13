@@ -1,6 +1,7 @@
 package com.piggymetrics.account.controller;
 
 import com.piggymetrics.account.domain.Account;
+import com.piggymetrics.account.domain.SavingProjection;
 import com.piggymetrics.account.domain.User;
 import com.piggymetrics.account.service.AccountService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -9,6 +10,7 @@ import org.springframework.web.bind.annotation.*;
 
 import javax.validation.Valid;
 import java.security.Principal;
+import java.util.List;
 
 @RestController
 public class AccountController {
@@ -20,6 +22,13 @@ public class AccountController {
 	@RequestMapping(path = "/{name}", method = RequestMethod.GET)
 	public Account getAccountByName(@PathVariable String name) {
 		return accountService.findByName(name);
+	}
+
+	@PreAuthorize("#oauth2.hasScope('server') or #name.equals('demo') or #name.equals(authentication.name)")
+	@RequestMapping(path = "/{name}/savings/projection", method = RequestMethod.GET)
+	public List<SavingProjection> getSavingsProjection(@PathVariable String name,
+			@RequestParam(defaultValue = "12") int months) {
+		return accountService.getSavingsProjection(name, months);
 	}
 
 	@RequestMapping(path = "/current", method = RequestMethod.GET)
