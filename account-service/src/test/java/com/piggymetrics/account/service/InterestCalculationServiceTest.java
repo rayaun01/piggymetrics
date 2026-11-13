@@ -285,6 +285,57 @@ public class InterestCalculationServiceTest {
 		assertMoney("900", projections.get(0).getBalances().get(0));
 	}
 
+	@Test
+	public void shouldSkipInsufficientFundsSweepsInProjection() {
+		SweepRule rule = rule(SweepMode.FIXED_AMOUNT, "999999", SweepFrequency.MONTHLY);
+		rule.setSourceSavingId("goal");
+		rule.setTargetSavingId("checking");
+		Account account = account(4000, 1000, rule);
+		account.getSavings().get(1).setDeposit(true);
+		account.getSavings().get(1).setInterest(new BigDecimal("12"));
+		account.setIncomes(Collections.singletonList(item(3000, Currency.USD, TimePeriod.MONTH)));
+		account.setExpenses(Collections.singletonList(item(1000, Currency.USD, TimePeriod.MONTH)));
+
+		List<SavingProjection> projections = service.projectAccount(account, 12);
+
+		assertMoney("28000", last(projections.get(0).getBalances()));
+		// simple interest 1000 * 12% / 12 * 12 credited at term end
+		assertMoney("1120", last(projections.get(1).getBalances()));
+		assertMoney("1000", projections.get(1).getBalances().get(10));
+		assertMoney("0", projections.get(1).getMonthlyContribution());
+	}
+
+	@Test
+	public void shouldRunProjectedSweepOnceSourceCanCoverIt() {
+		Account account = account(0, 0, rule(SweepMode.FIXED_AMOUNT, "500", SweepFrequency.MONTHLY));
+		account.setIncomes(Collections.singletonList(item(300, Currency.USD, TimePeriod.MONTH)));
+		account.setExpenses(Collections.emptyList());
+
+		List<SavingProjection> projections = service.projectAccount(account, 2);
+
+		assertMoney("300", projections.get(0).getBalances().get(0));
+		assertMoney("0", projections.get(1).getBalances().get(0));
+		assertMoney("100", projections.get(0).getBalances().get(1));
+		assertMoney("500", projections.get(1).getBalances().get(1));
+	}
+
+	@Test
+	public void shouldCompoundSweptBalancesInProjection() {
+		Account account = account(0, 0, rule(SweepMode.THRESHOLD_EXCESS, "0", SweepFrequency.MONTHLY));
+		account.getSavings().get(1).setDeposit(true);
+		account.getSavings().get(1).setInterest(new BigDecimal("12"));
+		account.getSavings().get(1).setCapitalization(true);
+		account.setIncomes(Collections.singletonList(item(100, Currency.USD, TimePeriod.MONTH)));
+		account.setExpenses(Collections.emptyList());
+
+		List<SavingProjection> projections = service.projectAccount(account, 3);
+
+		// 100, 100 * 1.01 + 100, 201 * 1.01 + 100
+		assertMoney("100", projections.get(1).getBalances().get(0));
+		assertMoney("201", projections.get(1).getBalances().get(1));
+		assertMoney("303.01", projections.get(1).getBalances().get(2));
+	}
+
 	private static void assertMoney(String expected, BigDecimal actual) {
 		assertEquals("expected " + expected + " but was " + actual, 0, new BigDecimal(expected).compareTo(actual));
 	}

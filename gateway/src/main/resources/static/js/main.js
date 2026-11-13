@@ -232,7 +232,7 @@ function renderSavingsList() {
             + '<input type="number" class="saving-amount" min="0" step="0.01" value="' + s.amount + '" aria-label="Amount">'
             + '<select class="saving-currency" aria-label="Currency">' + optionsHtml(SAVING_CURRENCIES, s.currency) + '</select>'
             + '<label class="saving-flag"><input type="checkbox" class="saving-deposit"' + (s.deposit ? ' checked' : '') + '> Interest</label>'
-            + '<input type="number" class="saving-interest" min="0" max="99.99" step="0.01" value="' + s.interest + '"' + (s.deposit ? '' : ' disabled') + ' aria-label="Annual interest"> %'
+            + '<input type="number" class="saving-interest" min="0" max="99.99" step="0.01" value="' + s.interest + '"' + (s.deposit ? '' : ' disabled') + ' aria-label="Annual interest"><span class="saving-percent">%</span>'
             + '<label class="saving-flag"><input type="checkbox" class="saving-capitalization"' + (s.capitalization ? ' checked' : '') + (s.deposit ? '' : ' disabled') + '> Monthly capitalization</label>'
             + '</div>';
     }).join("");

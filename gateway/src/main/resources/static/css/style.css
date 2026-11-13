@@ -2832,6 +2832,7 @@ only screen and (min-resolution: 144dpi) {
 
 /* =============== MULTIPLE SAVINGS =============== */
 #savingsheader {
+	display: none;
 	position: relative;
 	height: 62px;
 	border-bottom: 1px solid #e2e2e2;
@@ -2840,7 +2841,7 @@ only screen and (min-resolution: 144dpi) {
 #savingsheader .savingstitle12 { left: 25px; top: 38px; position: absolute; }
 #savingslist {
 	position: relative;
-	height: 268px;
+	height: 330px;
 	overflow-y: auto;
 	text-transform: none;
 }
@@ -2863,11 +2864,12 @@ only screen and (min-resolution: 144dpi) {
 	padding: 2px 4px;
 	margin: 2px 4px 2px 0;
 }
-.saving-card .saving-name { width: 46%; font-size: 15px; }
-.saving-card .saving-type { width: 32%; }
+.saving-card .saving-name { width: 44%; font-size: 15px; }
+.saving-card .saving-type { width: 40%; }
 .saving-card .saving-amount { width: 46%; font-family: "Museo-100"; font-size: 20px; }
 .saving-card .saving-interest { width: 52px; }
 .saving-card .saving-flag { display: inline-block; margin-right: 6px; cursor: pointer; }
+.saving-card .saving-percent { margin: 0 14px 0 2px; }
 .saving-card input[type=checkbox] { vertical-align: middle; }
 .saving-remove {
 	position: absolute;

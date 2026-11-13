@@ -164,87 +164,106 @@ public class InterestCalculationService {
 	 * at their monthly-equivalent rate.
 	 */
 	public List<SavingProjection> projectAccount(Account account, int months) {
+		Assert.isTrue(months >= 0, "months must not be negative");
 
-		List<Saving> savings = account.getSavings() == null ? Collections.emptyList() : account.getSavings();
-		Map<String, BigDecimal> contributions = monthlyContributions(account);
-		List<SavingProjection> projections = new ArrayList<>();
-
+		List<Saving> savings = nullToEmpty(account.getSavings());
+		Map<String, Saving> byId = index(savings);
+		Map<String, BigDecimal> balances = new LinkedHashMap<>();
+		Map<String, BigDecimal> pendingInterest = new HashMap<>();
+		Map<String, BigDecimal> netFlow = new HashMap<>();
+		Map<String, List<BigDecimal>> history = new HashMap<>();
 		for (Saving saving : savings) {
-			BigDecimal contribution = contributions.getOrDefault(saving.getId(), BigDecimal.ZERO);
+			balances.put(saving.getId(), saving.getAmount().setScale(SCALE, RoundingMode.HALF_UP));
+			pendingInterest.put(saving.getId(), BigDecimal.ZERO);
+			netFlow.put(saving.getId(), BigDecimal.ZERO);
+			history.put(saving.getId(), new ArrayList<>(months));
+		}
 
+		Function<Currency, Optional<BigDecimal>> surplus = memoize(currency -> monthlySurplus(account, currency));
+		Saving primary = primarySaving(savings);
+		BigDecimal primaryInflow = primary == null
+				? BigDecimal.ZERO
+				: surplus.apply(primary.getCurrency()).orElse(BigDecimal.ZERO);
+
+		for (int month = 1; month <= months; month++) {
+			for (Saving saving : savings) {
+				BigDecimal interest = monthlyInterest(saving, balances.get(saving.getId()));
+				if (Boolean.TRUE.equals(saving.getCapitalization())) {
+					balances.merge(saving.getId(), interest, BigDecimal::add);
+				} else {
+					pendingInterest.merge(saving.getId(), interest, BigDecimal::add);
+				}
+			}
+
+			if (primary != null) {
+				balances.merge(primary.getId(), primaryInflow, BigDecimal::add);
+				netFlow.merge(primary.getId(), primaryInflow, BigDecimal::add);
+			}
+
+			for (SweepRule rule : nullToEmpty(account.getSweepRules())) {
+				Saving source = byId.get(rule.getSourceSavingId());
+				Saving target = byId.get(rule.getTargetSavingId());
+				if (source == null || target == null || source == target) {
+					continue;
+				}
+
+				BigDecimal sourceBalance = balances.get(source.getId());
+				BigDecimal amount = monthlySweepAmount(rule, sourceBalance, surplus.apply(source.getCurrency()));
+				if (amount.signum() <= 0 || amount.compareTo(sourceBalance) > 0) {
+					continue;
+				}
+
+				convert(source.getCurrency(), target.getCurrency(), amount).ifPresent(credited -> {
+					balances.merge(source.getId(), amount.negate(), BigDecimal::add);
+					netFlow.merge(source.getId(), amount.negate(), BigDecimal::add);
+					balances.merge(target.getId(), credited, BigDecimal::add);
+					netFlow.merge(target.getId(), credited, BigDecimal::add);
+				});
+			}
+
+			for (Saving saving : savings) {
+				if (month == months) {
+					balances.merge(saving.getId(), pendingInterest.get(saving.getId()), BigDecimal::add);
+				}
+				history.get(saving.getId()).add(balances.get(saving.getId()).setScale(SCALE, RoundingMode.HALF_UP));
+			}
+		}
+
+		List<SavingProjection> projections = new ArrayList<>();
+		for (Saving saving : savings) {
 			SavingProjection projection = new SavingProjection();
 			projection.setSavingId(saving.getId());
 			projection.setName(saving.getName());
 			projection.setType(saving.getType());
 			projection.setCurrency(saving.getCurrency());
 			projection.setCurrent(saving.getAmount());
-			projection.setMonthlyContribution(contribution.setScale(SCALE, RoundingMode.HALF_UP));
-			projection.setBalances(projectMonths(saving, contribution, months));
+			projection.setMonthlyContribution(months == 0
+					? BigDecimal.ZERO.setScale(SCALE)
+					: netFlow.get(saving.getId()).divide(BigDecimal.valueOf(months), SCALE, RoundingMode.HALF_UP));
+			projection.setBalances(history.get(saving.getId()));
 			projections.add(projection);
 		}
-
 		return projections;
 	}
 
 	/**
-	 * Steady-state net monthly flow into each saving, in the saving currency
+	 * Amount a rule moves over one projected month; weekly rules are scaled to a month
 	 */
-	Map<String, BigDecimal> monthlyContributions(Account account) {
-
-		Map<String, Saving> savings = index(account.getSavings());
-		Map<String, BigDecimal> net = new LinkedHashMap<>();
-		savings.keySet().forEach(id -> net.put(id, BigDecimal.ZERO));
-
-		Function<Currency, Optional<BigDecimal>> surplus = memoize(currency -> monthlySurplus(account, currency));
-
-		Saving primary = primarySaving(account.getSavings());
-		if (primary != null) {
-			surplus.apply(primary.getCurrency()).ifPresent(value -> net.put(primary.getId(), value));
+	private BigDecimal monthlySweepAmount(SweepRule rule, BigDecimal sourceBalance, Optional<BigDecimal> monthlySurplus) {
+		switch (rule.getMode()) {
+			case FIXED_AMOUNT:
+				return rule.getFrequency() == SweepFrequency.WEEKLY
+						? rule.getValue().multiply(TimePeriod.MONTH.getBaseRatio()).divide(DAYS_IN_WEEK, SCALE, RoundingMode.HALF_UP)
+						: rule.getValue();
+			case PERCENT_OF_SURPLUS:
+				return monthlySurplus
+						.map(value -> percent(value.max(BigDecimal.ZERO), rule.getValue()))
+						.orElse(BigDecimal.ZERO);
+			case THRESHOLD_EXCESS:
+				return sourceBalance.subtract(rule.getValue());
+			default:
+				throw new IllegalArgumentException("unsupported sweep mode: " + rule.getMode());
 		}
-
-		if (account.getSweepRules() == null) {
-			return net;
-		}
-
-		for (SweepRule rule : account.getSweepRules()) {
-			Saving source = savings.get(rule.getSourceSavingId());
-			Saving target = savings.get(rule.getTargetSavingId());
-			if (source == null || target == null || source == target) {
-				continue;
-			}
-
-			BigDecimal monthly;
-			switch (rule.getMode()) {
-				case FIXED_AMOUNT:
-					monthly = rule.getFrequency() == SweepFrequency.WEEKLY
-							? rule.getValue().multiply(TimePeriod.MONTH.getBaseRatio()).divide(DAYS_IN_WEEK, SCALE, RoundingMode.HALF_UP)
-							: rule.getValue();
-					break;
-				case PERCENT_OF_SURPLUS:
-					monthly = surplus.apply(source.getCurrency())
-							.map(value -> percent(value.max(BigDecimal.ZERO), rule.getValue()))
-							.orElse(BigDecimal.ZERO);
-					break;
-				case THRESHOLD_EXCESS:
-					// once the source sits at its threshold, all of its further inflow is swept
-					monthly = net.get(source.getId()).max(BigDecimal.ZERO);
-					break;
-				default:
-					throw new IllegalArgumentException("unsupported sweep mode: " + rule.getMode());
-			}
-
-			if (monthly.signum() <= 0) {
-				continue;
-			}
-
-			BigDecimal moved = monthly;
-			convert(source.getCurrency(), target.getCurrency(), moved).ifPresent(credited -> {
-				net.put(source.getId(), net.get(source.getId()).subtract(moved));
-				net.put(target.getId(), net.get(target.getId()).add(credited));
-			});
-		}
-
-		return net;
 	}
 
 	/**
