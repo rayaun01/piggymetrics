@@ -132,9 +132,6 @@ function initStatisticPage() {
 			}
 		}
 
-		savings.freeMoney =
-			(savings.freeMoney * rubRate(user.lastCurr) /
-				rubRate(user.checkedCurr)).toFixed(3);
 		user.lastCurr = user.checkedCurr;
 	};
 
@@ -200,172 +197,49 @@ function initStatisticPage() {
 	initlines(incomes);
 	initlines(expenses);
 
-	// FUTURE SAVINGS CALCULATION
-	initSavingsCircles = function (slidervalue, lastslidervalue, beforevalue, beforemiddlevalue, animatetime) {
+	// FUTURE SAVINGS: balances are projected by account-service, here they are only converted and drawn
+	initSavingsCircles = function (animatetime) {
 
-		var monthSavings = [],
-				depositMonthSavings = [],
-				delta = incomesSumMonth - expensesSumMonth,
-				deltaDeposit = delta * slidervalue,
-				deltaNoDeposit =  delta * (1 - slidervalue),
-				percent = savings.percent,
-				deltapercents = 0;
-		monthSavings[0] = parseInt(savings.freeMoney, 10);
+		var projections = savingsProjection || [],
+				monthSavings = [],
+				beforevalue = Number($("#after-savings-value").data("lastvalue")) || 0,
+				beforemiddlevalue = Number($("#after-savings-value").data("lastmiddlevalue")) || 0,
+				listHtml = "";
 
-		// Set deposit tips next to slider
-		if (slidervalue === 0) {
-			$("#savingsTip100").hide();
-			$("#savingsTip0").fadeIn(200);
-		}
-		else if (slidervalue === 1) {
-			$("#savingsTip0").hide();
-			$("#savingsTip100").fadeIn(200);
-		}
-		else {
-			$("#savingsTip0, #savingsTip100").fadeOut(200);
+		for (var m = 0; m < 13; m++) {
+			monthSavings[m] = 0;
 		}
 
-		if (delta >= 0) {	// if incomes > expenses
-			if (savings.deposit) {	// deposit turned on
-				if (savings.capitalization) { // capitalization turned on (percent adds every month)
-					if (delta === 0) { // delta = 0
-						$('#savings-slider').css({"opacity": "0.5"}).attr('disabled', 'disabled');
-						$("#savingsTip100, #savingsTip0").hide();
-						for (var k=1; k < 13; k++) {
-							monthSavings[k] = ( parseInt(monthSavings[ (k-1) ], 10) + delta );
-						}
-						if (monthSavings[0] === 0) { // Savings = 0
-							// Draw horizontal chart
-							$({ value: 91 }).animate({ value: 155 }, {
-								duration: animatetime,
-								easing: 'swing',
-								step: function () {
-									drawChartLine(this.value);
-								}
-							});
-						}
-						else { // Savings > 0
-							// Draw increasing chart
-							$({ value: 91 }).animate({ value: 70 }, {
-								duration: animatetime,
-								easing: 'swing',
-								step: function () {
-									drawChartLine(this.value);
-								}
-							});
-						}
-					}
-					else { // delta > 0
-						$('#savings-slider').css({"opacity": "1"}).removeAttr('disabled');
-						// Animate chart
-						$({ value: lastslidervalue}).animate({ value: slidervalue }, {
-							duration: animatetime,
-							easing: 'swing',
-							step: function () {
-								drawChartLine(110 - (this.value) * 95);
-							}
-						});
-					}
-					depositMonthSavings[0] = monthSavings[0];
-					for (var i=1; i < 13; i++) {
-						depositMonthSavings[i] = ( deltaDeposit + parseInt(depositMonthSavings[ (i-1) ], 10) + ( parseInt(depositMonthSavings[ (i-1) ], 10) * percent * 30.41666667 / 36500 ) ) // including delta in the last MONTH!
-						monthSavings[i] = (depositMonthSavings[i] + (deltaNoDeposit * i));
-					}
-				}
-				else {	 // capitalization turned off (percent adds in the last MONTH)
-					if (delta === 0) {
-						$('#savings-slider').css({"opacity": "0.5"}).attr('disabled', 'disabled');
-						$("#savingsTip100, #savingsTip0").hide();
-						if (monthSavings[0] === 0) {
-							// Draw horizontal chart
-							$({ value: 91 }).animate({ value: 155 }, {
-								duration: animatetime,
-								easing: 'swing',
-								step: function () {
-									drawChartLine(this.value);
-								}
-							});
-						}
-						else {
-							// Draw increasing chart
-							$({ value: 91 }).animate({ value: 80 }, {
-								duration: animatetime,
-								easing: 'swing',
-								step: function () {
-									drawChartLine(this.value);
-								}
-							});
-						}
-					}
-					else {
-						$('#savings-slider').css({"opacity": "1"}).removeAttr('disabled');
-						// Animate chart
-						$({ value: lastslidervalue}).animate({ value: slidervalue }, {
-							duration: animatetime,
-							easing: 'swing',
-							step: function () {
-								drawChartLine(110 - (this.value) * 95);
-							}
-						});
-					}
-					for (var j=1; j < 12; j++) {
-						monthSavings[j] = ( parseInt(monthSavings[ (j-1) ], 10) + deltaDeposit );
-						deltapercents = deltapercents + ( deltaDeposit * percent * j / 1200 );
-					}
-					monthSavings[12] = (monthSavings[0] * (1 + (savings.percent / 100)) ) + (deltaDeposit * 12) + (deltaNoDeposit * 12) + deltapercents; // including delta in the last month!
-				}
+		$.each(projections, function (index, projection) {
+			var current = toCheckedCurrency(projection.current, projection.currency),
+					balances = projection.balances || [],
+					last = balances.length ? toCheckedCurrency(balances[balances.length - 1], projection.currency) : current;
+			monthSavings[0] += current;
+			for (var k = 1; k < 13; k++) {
+				monthSavings[k] += k <= balances.length ? toCheckedCurrency(balances[k - 1], projection.currency) : current;
 			}
-			else {		// deposit turned off
-				$('#savings-slider').css({"opacity": "0.5"}).attr('disabled', 'disabled');
-				$("#savingsTip100, #savingsTip0").hide();
-				$('.noUi-handle:after').css({"opacity": "0"})
-				for (var k=1; k < 13; k++) {
-					monthSavings[k] = ( parseInt(monthSavings[ (k-1) ], 10) + delta );
-				}
-				if (delta === 0) {
-					// Draw horizontal chart
-					$({ value: 91 }).animate({ value: 155 }, {
-						duration: animatetime,
-						easing: 'swing',
-						step: function () {
-							drawChartLine(this.value);
-						}
-					});
-				}
-				else {
-					// Draw increasing chart
-					$({ value: 91 }).animate({ value: 120 }, {
-						duration: animatetime,
-						easing: 'swing',
-						step: function () {
-							drawChartLine(this.value);
-						}
-					});
-				}
-			}
-		}
-		else {	// if incomes < expenses
-			$('#savings-slider').css({"opacity": "0.5"}).attr('disabled', 'disabled');
-			$("#savingsTip100, #savingsTip0").hide();
-			$('.noUi-handle:after').css({"opacity": "0"});
-			for (var n=1; n < 13; n++) {
-				monthSavings[n] = ( parseInt(monthSavings[ (n-1) ], 10) + delta );
-			}
-			// Draw decreasing chart
-			$({ value: 91 }).animate({ value: 175 }, {
-				duration: animatetime,
-				easing: 'swing',
-				step: function () {
-					drawChartLine(this.value);
-				}
-			});
-		}
+			listHtml += '<div class="projection-row" data-id="' + escape(projection.savingId) + '">'
+				+ '<span class="projection-name">' + escape(projection.name) + ' <span class="projection-type">' + escape((projection.type || "").toLowerCase()) + '</span></span>'
+				+ '<span class="projection-values">' + separateNumber(Math.round(current)) + ' &rarr; <b>' + separateNumber(Math.round(last)) + '</b>' + ($(".curr").first().data("curr") || "") + '</span>'
+				+ '</div>';
+		});
+		$("#savings-projection-list").html(listHtml);
 
-		var aftervalue = monthSavings[12];
+		var aftervalue = monthSavings[12],
+				growth = aftervalue - monthSavings[0];
 
-		$("#before-savings-value").html( separateNumber( Math.round(savings.freeMoney) ) );
-		$("#after-savings-value").data({"lastvalue": aftervalue, "lastmiddlevalue": monthSavings[6]}).html( separateNumber(Math.round((savings.freeMoney * 10.222) / 100) * 100) );
-		$("#savings-slider").data("lastpercent", $("#savings-slider").data("checkedPercent"));
+		// Chart slope: decreasing, flat or rising in proportion to growth
+		var chartposition = growth < 0 ? 175 : growth === 0 ? 155 : 110 - Math.min(1, growth / Math.max(Math.abs(monthSavings[0]), 1)) * 95;
+		$({ value: 91 }).animate({ value: chartposition }, {
+			duration: animatetime,
+			easing: 'swing',
+			step: function () {
+				drawChartLine(this.value);
+			}
+		});
+
+		$("#before-savings-value").html( separateNumber( Math.round(monthSavings[0]) ) );
+		$("#after-savings-value").data({"lastvalue": aftervalue, "lastmiddlevalue": monthSavings[6]});
 
 		// Set font-size in big circle
 		(function() {
@@ -378,7 +252,7 @@ function initStatisticPage() {
 			else {
 				$("#after-savings-value").css({"font-size": "37px"})
 			}
-			if (Math.abs (beforevalue) > 9999999 ) {
+			if (Math.abs (monthSavings[0]) > 9999999 ) {
 				$("#before-savings-value").css({"font-size": "26px"})
 			}
 		})();
@@ -388,8 +262,8 @@ function initStatisticPage() {
 			duration: animatetime,
 			easing: 'linear',
 			step: function () {
-				$("#after-savings-value").html(separateNumber( Math.round(this.value / 10) * 10));
-				$("#month12").children(".large-month-val").children(".val").html(separateNumber(Math.round(this.value / 10) * 10));
+				$("#after-savings-value").html(separateNumber( Math.round(this.value)));
+				$("#month12").children(".large-month-val").children(".val").html(separateNumber(Math.round(this.value)));
 			}
 		});
 		// Animate middle value on chart
@@ -402,22 +276,17 @@ function initStatisticPage() {
 		});
 		// Set precision value
 		setTimeout(function() {
-			$("#after-savings-value").html(separateNumber( Math.round(aftervalue / 10) * 10));
-			$("#month12").children(".large-month-val").children(".val").html(separateNumber(Math.round(aftervalue / 10) * 10));
+			$("#after-savings-value").html(separateNumber( Math.round(aftervalue)));
+			$("#month12").children(".large-month-val").children(".val").html(separateNumber(Math.round(aftervalue)));
+			$("#month6").children(".large-month-val").children(".val").html(separateNumber(Math.round(monthSavings[6])));
 		}, animatetime+20);
 
 		// Set every month values on chart
-		for (i = 1; i < 12; i++) {
+		for (var i = 1; i < 12; i++) {
 			$("#month" + i).children(".month-val").children(".val").html(separateNumber(Math.round(monthSavings[i])));
 		}
 		$("#month6, #month12").children(".month-val").html("");
-	}
-
-	// Launch Savings circles
-	if (typeof $("#savings-slider").data('checkedPercent') == 'undefined')
-	{
-		$("#savings-slider").data({"checkedPercent": Number(user.checkedPercent) });
-	}
+	};
 
 	// Change currency stuff
 	$("#rubcurr, #eurcurr, #usdcurr").removeClass("currchecked");
@@ -566,19 +435,7 @@ $(".currunchecked").click(function() {
 	runConvert();
 
 	initStatisticPage();
-	setTimeout(function() { initSavingsCircles($("#savings-slider").data("checkedPercent"), 0.2, savings.freeMoney, savings.freeMoney, 700) }, 100);
-	initCircle("first", $("#first-circle").data("item"), 0);
-	initCircle("second", $("#second-circle").data("item"), 0);
-	initCircle("third", $("#third-circle").data("item"), 0);
-
-	$('#savings-slider').noUiSlider({
-		start: (incomesSumMonth-expensesSumMonth) * $("#savings-slider").data("checkedPercent"),
-		step: (incomesSumMonth-expensesSumMonth) / 20,
-		range: {
-			'min': [ 0 ],
-			'max': [ Math.abs(incomesSumMonth-expensesSumMonth) ]
-		}
-	}, true);
+	setTimeout(function() { initSavingsCircles(700) }, 100);
 });
 
 $("#outermaindiv, #incomes-cursor, #expense-cursor, .lines-title").click(function() {
@@ -631,41 +488,40 @@ $("#circle-select-1, #circle-select-2, #circle-select-3").on("change", function(
 	$("#" + circle + "-back").removeClass().addClass( column[item].icon );
 });
 
-function initSavingsSlider() {
-	var Link = $.noUiSlider.Link,
-			sub;
-	simpleSeparateNumber = function(val) {
-		if (Math.abs (val) > 999) {
-			val = val.toString().replace(/(\d)(?=(\d\d\d)+(?!\d))/g, '$1 ');
-		}
-		else {
-			val = val.toString().replace(/(\.)/g, '$1');
-		}
-		return val;
-	};
-	$('#savings-slider').noUiSlider({
-		start: (incomesSumMonth-expensesSumMonth) * user.checkedPercent,
-		step: (incomesSumMonth-expensesSumMonth) / 20,
-		range: {
-			'min': [ 0 ],
-			'max': [ incomesSumMonth-expensesSumMonth ]
+var savingsProjection = null;
+
+function rubPerUnit(currency) {
+	switch (currency) {
+		case "EUR": return global.eur;
+		case "USD": return global.usd;
+		case "JPY": return global.jpy;
+		default: return 1;
+	}
+}
+
+function toCheckedCurrency(amount, currency) {
+	return Number(amount) * rubPerUnit(currency) / rubPerUnit(user.checkedCurr);
+}
+
+// Loads per-saving 12-month projections computed by account-service
+function loadSavingsProjection(animatetime) {
+	var token = getOauthTokenFromStorage(),
+			headers = (global.savePermit && token) ? {'Authorization': 'Bearer ' + token} : {};
+	$.ajax({
+		url: 'accounts/' + encodeURIComponent(user.login) + '/savings/projection?months=12',
+		datatype: 'json',
+		type: 'get',
+		headers: headers,
+		success: function (data) {
+			savingsProjection = data;
+			initSavingsCircles(animatetime);
 		},
-		serialization: {
-			lower: [
-				new Link({	target: function(value){ $("#savings-slider").data({"checkedPercent": Math.round(value / (incomesSumMonth-expensesSumMonth + 0.001) * 100) / 100}); $(".noUi-handle").attr({ percent: Math.round(value / (incomesSumMonth-expensesSumMonth + 0.001) * 100) + "%"  }) }, format: { decimals: 0 } }),
-				new Link({	target: function(value){ $(".noUi-handle").attr({ value: simpleSeparateNumber(Math.round(value / 10 ) * 10) + $(".curr").data("curr")}) }, format: { decimals: 0} })
-			]
+		error: function () {
+			savingsProjection = [];
+			$("#savings-projection-list").html('<div class="projection-error">Projection is unavailable right now</div>');
 		}
 	});
 }
-
-$('#savings-slider').on('slide', function() {
-	var lastVal = $("#after-savings-value").data("lastvalue"),
-			animatetime;
-	if (lastVal < 99999) animatetime = 200;
-	else animatetime = 700;
-	initSavingsCircles($("#savings-slider").data("checkedPercent"), $("#savings-slider").data("lastpercent"), lastVal, $("#after-savings-value").data("lastmiddlevalue"), animatetime);
-});
 
 (function(){
 	var canvas1 = document.getElementById("movingcircle-1"),

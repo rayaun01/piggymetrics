@@ -1766,7 +1766,7 @@ input#deposit:checked + label.button:after, input#capitalization:checked + label
 	display: block;
 }
 /* SAVINGS SLIDER */
-#savings-slider-container {
+#savings-projection-container {
 	width: 260px;
 	height: 50px;
 	position: absolute;
@@ -2556,7 +2556,7 @@ input#deposit:checked + label.button:after, input#capitalization:checked + label
 	#savingscircles {
 		bottom: 0px;
 	}
-	#savings-slider-container {
+	#savings-projection-container {
 		bottom: 20px;
 	}
 	#savingstitle {
@@ -2577,7 +2577,7 @@ input#deposit:checked + label.button:after, input#capitalization:checked + label
 	#savingscircles {
 		bottom: 25px;
 	}
-	#savings-slider-container {
+	#savings-projection-container {
 		bottom: 30px;
 	}
 	#savingstitle {
@@ -2621,7 +2621,7 @@ input#deposit:checked + label.button:after, input#capitalization:checked + label
 	#savingscircles {
 		bottom: 10px;
 	}
-	#savings-slider-container {
+	#savings-projection-container {
 		bottom: 30px;
 	}
 	#savingstitle {
@@ -2829,3 +2829,129 @@ only screen and (min-resolution: 144dpi) {
 	}
 }
 
+
+/* =============== MULTIPLE SAVINGS =============== */
+#savingsheader {
+	position: relative;
+	height: 62px;
+}
+#savingsheader span { display: none; }
+#savingslist {
+	position: relative;
+	height: 268px;
+	overflow-y: auto;
+	text-transform: none;
+}
+.saving-card {
+	position: relative;
+	padding: 10px 25px 8px 25px;
+	border-bottom: 1px solid #e2e2e2;
+	font-family: "Museo-300";
+	font-size: 12px;
+	color: #b5b5b5;
+}
+.saving-card.saving-deposit-on { color: #4b4b4b; }
+.saving-card input[type=text], .saving-card input[type=number], .saving-card select,
+.sweep-row input, .sweep-row select {
+	font-family: "Museo-300";
+	font-size: 13px;
+	color: #4b4b4b;
+	border: 1px solid #e2e2e2;
+	background: white;
+	padding: 2px 4px;
+	margin: 2px 4px 2px 0;
+}
+.saving-card .saving-name { width: 44%; font-size: 15px; }
+.saving-card .saving-type { width: 40%; }
+.saving-card .saving-amount { width: 46%; font-family: "Museo-100"; font-size: 20px; }
+.saving-card .saving-interest { width: 52px; }
+.saving-card .saving-flag { display: inline-block; margin-right: 6px; cursor: pointer; }
+.saving-card .saving-percent { margin: 0 14px 0 2px; }
+.saving-card input[type=checkbox] { vertical-align: middle; }
+.saving-remove {
+	position: absolute;
+	top: 8px; right: 8px;
+	width: 20px; height: 20px;
+	line-height: 20px;
+	text-align: center;
+	font-size: 18px;
+	color: #a59b9e;
+	cursor: pointer;
+}
+.saving-remove:hover { color: #242424; }
+#savingscontrols {
+	position: absolute;
+	bottom: 0; left: 0; right: 0;
+	height: 58px;
+}
+.savings-control {
+	display: inline-block;
+	margin: 18px 0 0 25px;
+	font-family: "Museo-500";
+	font-size: 12px;
+	color: #3d8fa0;
+	cursor: pointer;
+}
+.savings-control:hover { color: #242424; }
+#add-sweeps {
+	visibility: hidden;
+	position: absolute;
+	top: 0; left: 0; right: 0; bottom: 0;
+	margin: auto;
+	width: 520px;
+	height: 530px;
+	z-index: 2000;
+}
+#add-sweeps > .modal-content { height: 560px; }
+.sweeps-hint {
+	position: absolute;
+	top: 52px; left: 30px; right: 30px;
+	font-family: "Museo-300";
+	font-size: 11px;
+	text-transform: none;
+	color: #a59b9e;
+}
+#sweeplist {
+	position: absolute;
+	top: 92px; left: 20px; right: 20px;
+	height: 350px;
+	overflow-y: auto;
+	text-align: left;
+	text-transform: none;
+}
+.sweep-row {
+	position: relative;
+	padding: 8px 30px 8px 8px;
+	border-bottom: 1px solid #e2e2e2;
+}
+.sweep-row .sweep-source, .sweep-row .sweep-target { width: 42%; }
+.sweep-row .sweep-mode { width: 38%; }
+.sweep-row .sweep-value { width: 22%; }
+.sweep-row .sweep-frequency { width: 28%; }
+.sweep-arrow { color: #a59b9e; margin-right: 4px; }
+.sweeps-empty {
+	padding: 30px;
+	text-align: center;
+	font-family: "Museo-300";
+	color: #a59b9e;
+}
+#addsweep { position: absolute; bottom: 76px; left: 0; margin-left: 30px; }
+#savings-projection-list {
+	position: absolute;
+	top: -66px; left: 0; right: 0;
+	height: 110px;
+	overflow-y: auto;
+	text-transform: none;
+}
+.projection-row {
+	font-family: "Museo-300";
+	font-size: 12px;
+	color: #5e5e5e;
+	padding: 3px 0;
+	border-bottom: 1px solid #efefef;
+	overflow: hidden;
+}
+.projection-name { float: left; }
+.projection-type { color: #a59b9e; font-style: italic; }
+.projection-values { float: right; }
+.projection-error { font-family: "Museo-300"; font-size: 12px; color: #a59b9e; font-style: italic; }

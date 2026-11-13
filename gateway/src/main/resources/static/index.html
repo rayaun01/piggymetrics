@@ -125,28 +125,32 @@
                 <div id="savings" class="columns"><div class="savings-sprite-title"></div>
                     <div class="blueline"></div>
                     <div class="brownline"></div>
-                    <div id="topsavingsline">
-                        <div id="piggyicon"></div>
-                        <span class="savingstitle14">My spare money</span>
-                        <span class="savingstitle12">At the moment</span>
-                        <div id="rublebox"></div><div id="rublesign"></div>
-                        <input type="text" name="savingsvalue" id="savingsvalue" data-a-sep=" " data-v-min="0" data-v-max="999999999" data-l-zero="deny" maxlength="12" autocomplete="off">
+                    <div id="savingsheader">
+                        <span class="savingstitle14">My savings</span>
+                        <span class="savingstitle12">Balances at the moment</span>
                     </div>
-                    <div id="bottomsavingsline">
-                        <input type="checkbox" name="deposit" id="deposit">
-                        <label for="deposit" class="button"></label>
-                        <label for="deposit" class="savingsdeposit">Accumulation account</label>
-                        <span class="savingspercent">Interest</span>
-                        <input type="text" name="percentvalue" id="percentvalue" data-a-sep=""  data-v-min="0.00" data-v-max="99.99" data-l-zero="deny" data-a-sign=" %" data-w-empty="sign" data-p-sign="s" maxlength="5" data-a-pad="false" size="6" data-a-dec="." autocomplete="off">
-                        <input type="checkbox" name="capitalization" id="capitalization">
-                        <label for="capitalization" class="button"></label>
-                        <label for="capitalization" class="savingscapital">Monthly capitalization</label>
+                    <div id="savingslist"></div>
+                    <div id="savingscontrols">
+                        <div id="addsaving" class="savings-control">+ Add saving</div>
+                        <div id="sweepsbutton" class="savings-control">Sweep rules <span id="sweepscount"></span></div>
                     </div>
                 </div>
                 <div id="savebutton"><div id="leftborder"></div><div id="centerborder"></div><div id="rightborder"></div><div id="save"></div></div>
             </div>
 
             <form action="user/save" id="saveoptions" method="post" autocomplete="off"></form>
+
+            <!-- SWEEP RULES WINDOW -->
+            <div id="add-sweeps">
+                <div class="modal-content">
+                    <div class="notes-title">Sweep rules</div>
+                    <div class="modal-close"><div class="close-sign"></div></div>
+                    <div class="sweeps-hint">Rules run in order every time you save, moving money between your savings once per period.</div>
+                    <div id="sweeplist"></div>
+                    <div id="addsweep" class="savings-control">+ Add rule</div>
+                    <div class="sweeps-save notes-save"><div class="modal-save-icon"></div><div class="modal-save-text">Save changes</div></div>
+                </div>
+            </div>
 
             <!-- NOTES WINDOW -->
             <div id="overlay"></div>
@@ -361,11 +365,9 @@
                     </div>
                 </div>
 
-                <div id="savings-slider-container">
-                    <span class="savings-slider">part of the spare money which you'll send to accumulation account every month:</span>
-                    <div id="savings-slider"></div>
-                    <div id="savingsTip0">Without monthly deposit refill</div>
-                    <div id="savingsTip100">All savings go to deposit every month</div>
+                <div id="savings-projection-container">
+                    <span class="savings-slider">Your savings in 12 months:</span>
+                    <div id="savings-projection-list"></div>
                 </div>
 
                 <div id="savingscircles">

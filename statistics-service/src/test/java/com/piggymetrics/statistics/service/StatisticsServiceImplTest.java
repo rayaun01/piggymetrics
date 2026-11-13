@@ -6,6 +6,7 @@ import com.piggymetrics.statistics.domain.Account;
 import com.piggymetrics.statistics.domain.Currency;
 import com.piggymetrics.statistics.domain.Item;
 import com.piggymetrics.statistics.domain.Saving;
+import com.piggymetrics.statistics.domain.SavingType;
 import com.piggymetrics.statistics.domain.TimePeriod;
 import com.piggymetrics.statistics.domain.timeseries.DataPoint;
 import com.piggymetrics.statistics.domain.timeseries.ItemMetric;
@@ -94,6 +95,7 @@ public class StatisticsServiceImplTest {
 		vacation.setPeriod(TimePeriod.YEAR);
 
 		Saving saving = new Saving();
+		saving.setId("primary");
 		saving.setAmount(new BigDecimal(1000));
 		saving.setCurrency(Currency.EUR);
 		saving.setInterest(new BigDecimal(3.2));
@@ -103,7 +105,17 @@ public class StatisticsServiceImplTest {
 		Account account = new Account();
 		account.setIncomes(ImmutableList.of(salary));
 		account.setExpenses(ImmutableList.of(grocery, vacation));
-		account.setSaving(saving);
+		Saving goal = new Saving();
+		goal.setId("goal");
+		goal.setName("Vacation fund");
+		goal.setType(SavingType.GOAL);
+		goal.setAmount(new BigDecimal(500));
+		goal.setCurrency(Currency.USD);
+		goal.setInterest(BigDecimal.ZERO);
+		goal.setDeposit(false);
+		goal.setCapitalization(false);
+
+		account.setSavings(ImmutableList.of(saving, goal));
 
 		final Map<Currency, BigDecimal> rates = ImmutableMap.of(
 				Currency.EUR, new BigDecimal("0.8"),
@@ -131,7 +143,7 @@ public class StatisticsServiceImplTest {
 
 		final BigDecimal expectedExpensesAmount = new BigDecimal("17.8861");
 		final BigDecimal expectedIncomesAmount = new BigDecimal("298.9802");
-		final BigDecimal expectedSavingAmount = new BigDecimal("1250");
+		final BigDecimal expectedSavingAmount = new BigDecimal("1750");
 
 		final BigDecimal expectedNormalizedSalaryAmount = new BigDecimal("298.9802");
 		final BigDecimal expectedNormalizedVacationAmount = new BigDecimal("11.6361");
@@ -143,6 +155,10 @@ public class StatisticsServiceImplTest {
 		assertTrue(expectedExpensesAmount.compareTo(dataPoint.getStatistics().get(StatisticMetric.EXPENSES_AMOUNT)) == 0);
 		assertTrue(expectedIncomesAmount.compareTo(dataPoint.getStatistics().get(StatisticMetric.INCOMES_AMOUNT)) == 0);
 		assertTrue(expectedSavingAmount.compareTo(dataPoint.getStatistics().get(StatisticMetric.SAVING_AMOUNT)) == 0);
+
+		assertEquals(2, dataPoint.getSavingBreakdown().size());
+		assertTrue(new BigDecimal("1250").compareTo(dataPoint.getSavingBreakdown().get("primary")) == 0);
+		assertTrue(new BigDecimal("500").compareTo(dataPoint.getSavingBreakdown().get("goal")) == 0);
 
 		ItemMetric salaryItemMetric = dataPoint.getIncomes().stream()
 				.filter(i -> i.getTitle().equals(salary.getTitle()))

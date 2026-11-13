@@ -24,3 +24,6 @@ server:
 feign:
   hystrix:
     enabled: true
+
+rates:
+  url: https://api.exchangeratesapi.io

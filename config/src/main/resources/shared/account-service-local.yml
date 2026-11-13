@@ -8,3 +8,6 @@ spring:
     mongodb:
       host: ${MONGO_HOST:localhost}
       database: piggymetrics_accounts
+
+rates:
+  url: "${RATES_URL:http://localhost:18080}"

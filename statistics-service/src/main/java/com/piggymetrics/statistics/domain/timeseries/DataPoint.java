@@ -26,6 +26,11 @@ public class DataPoint {
 
 	private Map<Currency, BigDecimal> rates;
 
+	/**
+	 * Saving id to its amount in {@link Currency#getBase()} currency
+	 */
+	private Map<String, BigDecimal> savingBreakdown;
+
 	public DataPointId getId() {
 		return id;
 	}
@@ -64,5 +69,13 @@ public class DataPoint {
 
 	public void setRates(Map<Currency, BigDecimal> rates) {
 		this.rates = rates;
+	}
+
+	public Map<String, BigDecimal> getSavingBreakdown() {
+		return savingBreakdown;
+	}
+
+	public void setSavingBreakdown(Map<String, BigDecimal> savingBreakdown) {
+		this.savingBreakdown = savingBreakdown;
 	}
 }

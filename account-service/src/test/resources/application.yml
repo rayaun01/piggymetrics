@@ -3,3 +3,6 @@ spring:
     mongodb:
       database: piggymetrics
       port: 0
+
+rates:
+  url: ${RATES_URL:http://localhost:1}

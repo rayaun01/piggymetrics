@@ -74,12 +74,14 @@ services:
       MONGO_HOST: mongodb
       AUTH_HOST: auth-service
       REGISTRY_HOST: registry
+      RATES_URL: http://rates-stub:18080
     restart: on-failure
     depends_on:
       - config
       - registry
       - auth-service
       - mongodb
+      - rates-stub
     ports:
       - "6000:6000"
 
